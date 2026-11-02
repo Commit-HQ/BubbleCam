@@ -1,0 +1,17 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "bubblecam",
+	"compatibility_date": "2026-10-30",
+	// The whole site is static files, which `npm run build` writes to build/: no Worker code runs, so
+	// Cloudflare serves every request from its static assets, which the Free plan doesn't count or limit.
+	// static/_headers adds the security and caching headers, and an address no page has gets the nearest
+	// 404.html, in the language of its path.
+	"assets": {
+		"directory": "build",
+		"not_found_handling": "404-page",
+		"html_handling": "auto-trailing-slash"
+	},
+	// The workers.dev address serves the current version. No preview address for each uploaded version.
+	"workers_dev": true,
+	"preview_urls": false
+}
