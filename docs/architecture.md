@@ -39,14 +39,14 @@ A new version takes over as soon as it's stored (`skipWaiting` and `clients.clai
 The privacy and app pages score 100 for performance, accessibility, best practices, and SEO in Lighthouse, on mobile and desktop, in both languages. Measure on a production build served as Cloudflare serves it (`npm run build && npm run preview`), not the development server. What keeps it there:
 
 - The privacy page carries no JavaScript.
-- Fonts are self-hosted variable fonts, only Latin and Latin Extended, with metric-matched local fallbacks (computed with Capsize), so text doesn't move when they swap in. `src/hooks.server.ts` preloads Fredoka everywhere, Hanken Grotesk only on the privacy page, and Latin Extended only on Croatian pages.
+- Fonts are self-hosted variable fonts, only Latin and Latin Extended, with metric-matched local fallbacks (computed with Capsize), so text doesn't move when they swap in. `src/hooks.server.ts` preloads Baloo 2 everywhere, Hanken Grotesk only on the privacy page, and Latin Extended only on Croatian pages.
 - The app's pages show their largest words in the prerendered HTML, and nothing larger appears later: the cartoons' page says what to do under its heading, and the studio shows a bear and the same words, drawn inline, while the camera starts. The largest contentful paint then comes with the first paint, and a camera problem, shown later in smaller type, doesn't move it.
 - Nothing heavy loads before it's needed: the encoding worker with the first picture, and Mediabunny, about 60 kB compressed, only with a video.
 - Files whose names change with their content are cached for a year (`static/_headers`).
 
 ## Design
 
-The look is BubbleBoard's cheerful glass in a younger key: translucent white surfaces over soft sky, pink, mint, and sun gradients on a warm cream canvas, with Fredoka, a rounded display font, for headings and the app's words, and Hanken Grotesk for text. The studio is a dark room instead, so the camera's picture is the brightest thing on the screen. The logo is BubbleBoard's three bubbles on a sky-to-violet tile, with the big one a red record button.
+The look is BubbleBoard's cheerful glass in a younger key: translucent white surfaces over soft sky, pink, mint, and sun gradients on a warm cream canvas, with Baloo 2, a rounded display font, for headings and the app's words, and Hanken Grotesk for text. The studio is a dark room instead, so the camera's picture is the brightest thing on the screen. The logo is BubbleBoard's three bubbles on a sky-to-violet tile, with the big one a red record button.
 
 `src/lib/styles/app.css`, the only stylesheet, holds the theme tokens (`ink`, `muted`, `canvas`, `accent`, the logo's `sky`, `mint`, `sun`, `pink`, and the shutter's `coral`, and the studio's `night` and `dusk`) and the utilities `glass`, `frosted`, `bg-brand`, `text-brand`, and `studio`. Style with Tailwind utilities in markup; component `<style>` blocks hold keyframes and grid areas, which Tailwind can't say well. Palette colours are not automatically text colours: sky, mint, sun, and pink are too light for text on the canvas.
 

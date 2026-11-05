@@ -16,14 +16,14 @@ is static/third-party-notices.txt.
 FONTS
 -----
 
-Fredoka and Hanken Grotesk, bundled from the Fontsource packages
-@fontsource-variable/fredoka 5.3.0 and @fontsource-variable/hanken-grotesk
+Baloo 2 and Hanken Grotesk, bundled from the Fontsource packages
+@fontsource-variable/baloo-2 5.3.0 and @fontsource-variable/hanken-grotesk
 5.3.0. Their license files follow.
 
-Fredoka
+Baloo 2
 .......
 
-Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One)
+Copyright 2019 The Baloo 2 Project Authors (https://github.com/EkType/Baloo2)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

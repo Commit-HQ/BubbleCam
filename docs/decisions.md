@@ -43,7 +43,7 @@ Why BubbleCam behaves the way it does. Each entry is a decision the code alone d
 
 - **SvelteKit 3**, while BubbleBoard is on SvelteKit 2: a new project starts on the current major version, and BubbleCam's few routes make it a gentle first step for the team.
 - **Static files on Cloudflare.** Every page is prerendered (`adapter-static`), and an assets-only Worker serves them, with `_headers` for security headers and a 404 page per language. Static asset requests cost nothing on Cloudflare's Free plan and have no daily limit.
-- **Fredoka**, a rounded font, for the display and the app's words, and BubbleBoard's Hanken Grotesk for text: a younger sibling's voice in the family's handwriting.
+- **Baloo 2**, a rounded font, for the display and the app's words, and BubbleBoard's Hanken Grotesk for text: a younger sibling's voice in the family's handwriting. It replaced Fredoka, which has no č, ć, or đ, so Croatian, the default language, fell back to another font in the middle of a word.
 
 ## Deferred
 
