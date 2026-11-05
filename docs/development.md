@@ -29,7 +29,7 @@ The camera needs a secure context. On the computer running the server, `localhos
 | `npm run deploy`    | Build and publish to Cloudflare                                            |
 | `npm version minor` | Raise the version and tag it, once the changelog has its entry (Releasing) |
 
-The development server has no service worker, so the app doesn't work offline there. Measure performance, for example with Lighthouse, on a production build (`npm run build && npm run preview`): development performance is not representative. The landing, privacy, and app pages should score 100 in all four categories, on mobile and desktop; the [architecture notes](architecture.md#speed) say what keeps it there. The 404 pages ask search engines not to index them, which the SEO score counts against them.
+The development server has no service worker, so the app doesn't work offline there. Measure performance, for example with Lighthouse, on a production build (`npm run build && npm run preview`): development performance is not representative. The privacy and app pages should score 100 in all four categories, on mobile and desktop; the [architecture notes](architecture.md#speed) say what keeps it there. The 404 pages ask search engines not to index them, which the SEO score counts against them.
 
 `npm test` covers what the code guarantees rather than component markup: the shape and size of pictures, the cartoons kept in IndexedDB (in Node, with `fake-indexeddb`), paths, both dictionaries, the CSP's hash of SvelteKit's announcer, and the changelog. The camera, the encoders, and the service worker need a browser: before a release, shoot a cartoon on a real phone or tablet, play it, make its video, and open the app again without a network.
 
@@ -47,7 +47,7 @@ rsvg-convert -w 64 -h 64 src/lib/assets/favicon.svg -o favicon-64.png
 magick favicon-64.png -define icon:auto-resize=32,16 static/favicon.ico
 ```
 
-`src/lib/assets/share.jpg`, the link preview, is the landing page's tablet beside the logo and name, 1200 by 630 pixels; take it again from the built page when either changes.
+`src/lib/assets/share.jpg`, the link preview, is the tablet of BubbleCam's page on Commit's site beside the logo and name, 1200 by 630 pixels; take it again from that page when either changes.
 
 ## Releasing
 
@@ -79,7 +79,7 @@ src/
   lib/
     app/                The app's screens: the studio's parts, the cartoons' cards, dialogs, installing
     assets/             The logo, the bubbles, and the link preview
-    components/         Components shared with the landing pages: header, icons, the hero's tablet, the bear
+    components/         Components shared by the pages: header, icons, the bear
     i18n/               Croatian and English copy
     studio/             The studio's engine: camera, pictures, storage, playing, video, sounds
     styles/             Tailwind entry, fonts, theme tokens, base styles

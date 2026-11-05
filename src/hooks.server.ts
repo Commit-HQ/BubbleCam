@@ -9,7 +9,7 @@ export const handle: Handle = ({ event, resolve }) => {
 	return resolve(event, {
 		transformPageChunk: ({ html }) => html.replace('%lang%', locale),
 		// Preload the fonts first paint needs: Fredoka, for headings and the app's few words, everywhere, and
-		// Hanken Grotesk for the landing pages' text. Only Croatian uses Latin Extended (č ć đ š ž).
+		// Hanken Grotesk for the privacy page's text. Only Croatian uses Latin Extended (č ć đ š ž).
 		preload: (file) => {
 			if (file.type !== 'font') return file.type === 'js' || file.type === 'css';
 			if (file.filename.includes('-latin-ext-') && locale !== 'hr') return false;

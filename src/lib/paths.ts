@@ -1,13 +1,10 @@
 import { defaultLocale, isLocale, type Locale } from '#lib/i18n/locales.ts';
 
-// Every path the site links to. The default language, Croatian, has no prefix (`/`, `/app`); English does
-// (`/en`, `/en/app`).
+// Every path the site links to. The default language, Croatian, has no prefix (`/app`); English does
+// (`/en/app`). The site's home sends you on to the app (static/_redirects): BubbleCam's landing page is on
+// Commit's site, at aboutUrl in project.ts.
 
 const prefix = (locale: Locale) => (locale === defaultLocale ? '' : `/${locale}`);
-
-export function homePath(locale: Locale) {
-	return prefix(locale) || '/';
-}
 
 export function privacyPath(locale: Locale) {
 	return `${prefix(locale)}/privacy`;

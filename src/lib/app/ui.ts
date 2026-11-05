@@ -1,5 +1,5 @@
 // Class names shared by the app's screens. The studio is a dark room with big round buttons, sized for small
-// fingers; the cartoons' page has the landing page's light glass.
+// fingers; the cartoons' page has the site's light glass.
 
 /** A round studio button holding one icon. Give it an `aria-label`; `aria-pressed` lights it up. */
 export const roundButton =

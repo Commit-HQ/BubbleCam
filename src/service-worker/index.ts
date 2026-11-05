@@ -1,6 +1,6 @@
 // BubbleCam's service worker keeps the whole site on the device, so the app opens and works without a network,
 // in a playroom without Wi-Fi or a car on the motorway. Installing a version stores every file it has, each
-// version in a cache of its own; the app's pages then come from the device, and the landing pages from the
+// version in a cache of its own; the app's pages then come from the device, and the privacy page from the
 // network when there is one.
 //
 // A new version takes over as soon as it's stored. The previous version's cache stays until the next one
@@ -57,7 +57,7 @@ self.addEventListener('fetch', (event) => {
 async function respond(request: Request, url: URL) {
 	const cache = await caches.open(current);
 	const page = request.mode === 'navigate';
-	// The landing pages come fresh when there's a network, and from the device when there isn't.
+	// The privacy page comes fresh when there's a network, and from the device when there isn't.
 	if (page && !isAppPath(url.pathname)) {
 		try {
 			return await fetch(request);

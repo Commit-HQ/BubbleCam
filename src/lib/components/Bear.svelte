@@ -1,6 +1,6 @@
 <script lang="ts">
-	// The teddy bear of the landing page's tablet, waving, drawn in the page itself rather than loaded as a file:
-	// it shows the moment the page does.
+	// The teddy bear, waving, drawn in the page itself rather than loaded as a file: it shows the moment the page
+	// does.
 	let { class: className = '' }: { class?: string } = $props();
 </script>
 

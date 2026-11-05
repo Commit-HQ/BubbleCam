@@ -48,7 +48,7 @@ Open the address Vite prints. The camera needs a secure context: `localhost` wor
 
 Svelte 5 and SvelteKit in strict TypeScript, Tailwind CSS v4, and the browser's own camera, canvas, IndexedDB, and video encoder. Every page is prerendered to a static file, so the site is hosted as plain files on Cloudflare, with no server code at all. The only library the app ships is [Mediabunny](https://mediabunny.dev), which writes the video file, and it loads only when a video is made.
 
-The landing pages carry no JavaScript, the app opens from the device's own copy once it has been visited, and the landing, privacy, and app pages score 100 in all four Lighthouse categories, on mobile and desktop. How that's kept up is in the [architecture notes](docs/architecture.md#speed).
+The app opens from the device's own copy once it has been visited, and the privacy and app pages score 100 in all four Lighthouse categories, on mobile and desktop. How that's kept up is in the [architecture notes](docs/architecture.md#speed).
 
 ## Host it
 

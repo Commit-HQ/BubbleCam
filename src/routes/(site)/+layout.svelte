@@ -7,8 +7,9 @@
 	import SiteHeader from '#lib/components/SiteHeader.svelte';
 	import ActionLink from '#lib/components/ActionLink.svelte';
 	import { defaultLocale, locales, messages } from '#lib/i18n/index.ts';
-	import { appPath, homePath, localizedPath, privacyPath } from '#lib/paths.ts';
+	import { appPath, localizedPath, privacyPath } from '#lib/paths.ts';
 	import {
+		aboutUrl,
 		absoluteUrl,
 		bubbleBoardUrl,
 		contactEmail,
@@ -20,10 +21,9 @@
 
 	let { children, data }: LayoutProps = $props();
 	const t = $derived(messages[data.locale]);
-	const home = $derived(homePath(data.locale));
-	const sections = $derived(
-		Object.entries(t.nav.sections).map(([id, label]) => ({ href: `${home}#${id}`, label }))
-	);
+	// The privacy page and the 404 pages. BubbleCam's landing page is on Commit's site (aboutUrl), and the site's
+	// home opens the app (static/_redirects), so the logo leads into the app.
+	const app = $derived(appPath(data.locale));
 	const project: { href: string; label: string; icon: IconName }[] = $derived([
 		{ href: repositoryUrl, label: t.footer.github, icon: 'github' },
 		{ href: `${repositoryUrl}/blob/main/LICENSE`, label: t.footer.license, icon: 'file' },
@@ -34,7 +34,7 @@
 
 <svelte:head>
 	<meta name="theme-color" content="#fffaf3" />
-	<!-- Every landing page in each language, for search engines. -->
+	<!-- Every page in each language, for search engines. -->
 	<link rel="canonical" href={absoluteUrl(page.url.pathname)} />
 	{#each locales as locale (locale)}
 		<link
@@ -60,7 +60,7 @@
 	<meta property="og:image" content={absoluteUrl(shareImage)} />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
-	<meta property="og:image:alt" content={t.hero.demo} />
+	<meta property="og:image:alt" content="BubbleCam · {t.title}" />
 	<meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 
@@ -72,23 +72,11 @@
 <!-- Decorative bubbles are clipped rather than scrolling the page sideways when enlarged text leaves no room.
 `clip`, unlike `hidden`, keeps the header sticky. -->
 <div class="mx-auto max-w-7xl overflow-x-clip px-4 sm:px-8 lg:px-10">
-	<SiteHeader href={home} label={t.home}>
-		<nav class="hidden lg:block" aria-label={t.nav.label}>
-			<ul class="flex">
-				{#each sections as { href, label } (href)}
-					<li>
-						<a
-							class="block rounded-full px-3 py-3 text-sm font-semibold text-muted transition-colors hover:bg-ink/5 hover:text-ink"
-							{href}>{label}</a
-						>
-					</li>
-				{/each}
-			</ul>
-		</nav>
+	<SiteHeader href={app} label={t.home}>
 		<div class="flex items-center gap-2">
 			<LanguageSwitch locale={data.locale} />
 			<div class="hidden sm:block">
-				<ActionLink href={appPath(data.locale)} label={t.nav.open} icon="camera" size="small" />
+				<ActionLink href={app} label={t.nav.open} icon="camera" size="small" />
 			</div>
 		</div>
 	</SiteHeader>
@@ -98,28 +86,22 @@
 	</main>
 
 	<footer class="mb-4 rounded-4xl glass p-7 sm:p-10">
-		<div class="grid gap-x-6 gap-y-8 md:grid-cols-3 md:gap-x-10 lg:grid-cols-[1.4fr_1fr_1fr]">
-			<div class="md:col-span-3 lg:col-span-1">
+		<div class="grid gap-x-6 gap-y-8 md:grid-cols-[1.4fr_1fr] md:gap-x-10">
+			<div>
 				<p
 					class="inline-flex items-center gap-2.5 font-display text-xl font-semibold tracking-tight"
 				>
 					<img src={favicon} alt="" width="32" height="32" />BubbleCam
 				</p>
-				<p class="mt-3 text-muted">{t.footer.tagline}</p>
+				<a class="mt-3 block text-muted hover:text-ink" href={aboutUrl(data.locale)}
+					>{t.footer.tagline}</a
+				>
 				<a
 					class="mt-2 inline-flex min-h-11 items-center gap-2 text-muted hover:text-ink"
 					href="mailto:{contactEmail}"
 				>
 					<Icon name="mail" class="size-4" />{contactEmail}
 				</a>
-			</div>
-			<div class="md:col-span-2 lg:col-span-1">
-				<h2 class="text-lg">{t.footer.explore}</h2>
-				<ul class="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-muted">
-					{#each sections as { href, label } (href)}
-						<li><a class="inline-flex min-h-10 items-center hover:text-ink" {href}>{label}</a></li>
-					{/each}
-				</ul>
 			</div>
 			<div>
 				<h2 class="text-lg">{t.footer.project}</h2>

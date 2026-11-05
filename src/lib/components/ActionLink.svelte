@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon, { type IconName } from './Icon.svelte';
 
-	// A landing page's main action: an ink pill with its icon in a coral circle, the shutter's colour.
+	// A page's main action: an ink pill with its icon in a coral circle, the shutter's colour.
 	let {
 		href,
 		label,

@@ -8,7 +8,8 @@
 	import LanguageSwitch from '#lib/components/LanguageSwitch.svelte';
 	import SiteHeader from '#lib/components/SiteHeader.svelte';
 	import { messages } from '#lib/i18n/index.ts';
-	import { appPath, homePath, privacyPath } from '#lib/paths.ts';
+	import { appPath, privacyPath } from '#lib/paths.ts';
+	import { aboutUrl } from '#lib/project.ts';
 	import { deleteFilm, getThumbs, listFilms, type Film } from '#lib/studio/films.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
@@ -153,7 +154,7 @@
 		class="mb-4 flex flex-wrap justify-between gap-x-6 gap-y-2 border-t border-ink/10 pt-6 text-sm text-muted"
 	>
 		<!-- Pages outside the app open in a window of their own, so the installed app keeps its place. -->
-		<a class="hover:text-ink" href={homePath(data.locale)} target="_blank" rel="noopener"
+		<a class="hover:text-ink" href={aboutUrl(data.locale)} target="_blank" rel="noopener"
 			>{t.footer.tagline}</a
 		>
 		<div class="flex flex-wrap gap-x-6 gap-y-2">

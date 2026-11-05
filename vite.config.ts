@@ -49,10 +49,9 @@ export default defineConfig({
 			// service workers runs; SvelteKit would register it as a module (src/routes/(app)/+layout.svelte).
 			serviceWorker: { register: false },
 			prerender: {
-				// The other language and the files no page links to, which crawling from `/` doesn't find.
+				// The other language and the files no page links to, which crawling doesn't find.
 				entries: [
 					'*',
-					'/en',
 					'/en/app',
 					'/en/app/film',
 					'/en/privacy',

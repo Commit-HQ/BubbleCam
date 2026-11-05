@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest';
-import { appPath, homePath, isAppPath, localizedPath, pathLocale, privacyPath } from './paths.ts';
+import { aboutUrl } from './project.ts';
+import { appPath, isAppPath, localizedPath, pathLocale, privacyPath } from './paths.ts';
 
 it('leaves the default language unprefixed', () => {
-	expect([homePath('hr'), homePath('en'), appPath('hr'), appPath('en')]).toEqual([
-		'/',
-		'/en',
-		'/app',
-		'/en/app'
+	expect([appPath('hr'), appPath('en')]).toEqual(['/app', '/en/app']);
+	expect([aboutUrl('hr'), aboutUrl('en')]).toEqual([
+		'https://bubbleboard.fyi/apps/bubblecam',
+		'https://bubbleboard.fyi/en/apps/bubblecam'
 	]);
 	expect([privacyPath('hr'), privacyPath('en')]).toEqual(['/privacy', '/en/privacy']);
 });
@@ -16,7 +16,7 @@ it('puts a cartoon in the query of the studio, and starts a new one without it',
 	expect(appPath('hr', {})).toBe('/app/film');
 });
 
-it('tells the app’s pages from the landing pages', () => {
+it('tells the app’s pages from the others', () => {
 	expect(['/app', '/app/film', '/en/app', '/en/app/film'].every(isAppPath)).toBe(true);
 	expect(['/', '/en', '/privacy', '/application', '/en/apple'].some(isAppPath)).toBe(false);
 });

@@ -30,7 +30,7 @@ Why BubbleCam behaves the way it does. Each entry is a decision the code alone d
 ## On the device, and only there
 
 - **No accounts and no server.** The site is static files; there's nothing to sign in to and nowhere for a picture to go. That makes it free to host for anyone and simple to trust: a teacher can tell parents that children's pictures stay on the tablet, because there's no code that could send them.
-- **Kept in IndexedDB, persistently where the browser agrees.** The first picture of a cartoon asks the browser to keep the site's storage for good. Chrome decides by itself, often by whether the app is installed; Firefox may ask. Safari can clear what a website keeps after about a week without a visit, but not what a Home Screen app keeps, so the cartoons' page shows iPhone and iPad users, until they put it away, how to add BubbleCam to the Home Screen, and the landing page's questions say why.
+- **Kept in IndexedDB, persistently where the browser agrees.** The first picture of a cartoon asks the browser to keep the site's storage for good. Chrome decides by itself, often by whether the app is installed; Firefox may ask. Safari can clear what a website keeps after about a week without a visit, but not what a Home Screen app keeps, so the cartoons' page shows iPhone and iPad users, until they put it away, how to add BubbleCam to the Home Screen, and BubbleCam's page on Commit's site says why in its questions.
 - **Save the ones you love as videos.** Browser storage can be cleared by its user, so the cartoons' page says, under its heading, that cartoons stay on the device and favourites are worth saving as videos.
 
 ## Installing and offline

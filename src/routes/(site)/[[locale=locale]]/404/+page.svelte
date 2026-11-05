@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Popped from '#lib/components/Popped.svelte';
 	import { messages } from '#lib/i18n/index.ts';
-	import { homePath } from '#lib/paths.ts';
+	import { appPath } from '#lib/paths.ts';
 	import type { PageProps } from './$types';
 
 	// The page Cloudflare serves, with a 404 status, for an address no file has: 404.html for Croatian and
@@ -16,5 +16,5 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl py-10">
-	<Popped locale={data.locale} missing back={homePath(data.locale)} label={t.home} />
+	<Popped locale={data.locale} missing back={appPath(data.locale)} label={t.app} />
 </div>
