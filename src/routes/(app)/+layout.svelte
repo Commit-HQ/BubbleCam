@@ -2,7 +2,7 @@
 	import { dev } from '$app/env';
 	import { afterNavigate } from '$app/navigation';
 	import '#lib/app/install.svelte.ts';
-	import { appPath } from '#lib/paths.ts';
+	import { appPath, manifestPath } from '#lib/paths.ts';
 	import { onMount } from 'svelte';
 	import type { LayoutProps } from './$types';
 
@@ -44,7 +44,7 @@
 </script>
 
 <svelte:head>
-	<link rel="manifest" href="{appPath(data.locale)}/manifest.webmanifest" />
+	<link rel="manifest" href={manifestPath(data.locale)} />
 </svelte:head>
 
 {@render children()}

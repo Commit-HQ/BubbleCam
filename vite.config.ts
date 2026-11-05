@@ -52,13 +52,13 @@ export default defineConfig({
 				// The other language and the files no page links to, which crawling doesn't find.
 				entries: [
 					'*',
-					'/en/app',
-					'/en/app/film',
+					'/en',
+					'/en/film',
 					'/en/privacy',
 					'/404',
 					'/en/404',
-					'/app/manifest.webmanifest',
-					'/en/app/manifest.webmanifest'
+					'/manifest.webmanifest',
+					'/en/manifest.webmanifest'
 				]
 			},
 			csp: {

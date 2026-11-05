@@ -21,7 +21,7 @@ export const GET: RequestHandler = ({ url }) => {
 	});
 	return Response.json(
 		{
-			id: '/app',
+			id: '/',
 			name: 'BubbleCam',
 			short_name: 'BubbleCam',
 			description: messages[locale].description,

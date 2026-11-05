@@ -22,7 +22,7 @@
 	let { children, data }: LayoutProps = $props();
 	const t = $derived(messages[data.locale]);
 	// The privacy page and the 404 pages. BubbleCam's landing page is on Commit's site (aboutUrl), and the site's
-	// home opens the app (static/_redirects), so the logo leads into the app.
+	// home is the app, where the logo leads.
 	const app = $derived(appPath(data.locale));
 	const project: { href: string; label: string; icon: IconName }[] = $derived([
 		{ href: repositoryUrl, label: t.footer.github, icon: 'github' },
