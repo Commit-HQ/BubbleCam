@@ -59,7 +59,7 @@
 	<a
 		class="group block rounded-4xl glass p-2 transition hover:-translate-y-1 hover:bg-white/80 motion-reduce:hover:translate-y-0"
 		href={appPath(locale, { id: film.id })}
-		aria-label={t.open(day, film.frames.length)}
+		aria-label={t.open(day, film.frames.length, Boolean(film.voice))}
 		onpointerenter={(event) => event.pointerType === 'mouse' && play()}
 		onpointerleave={stop}
 		onfocus={play}
@@ -79,6 +79,7 @@
 				class="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink/75 px-3 py-1 font-display font-semibold text-white"
 			>
 				<Icon name="film" class="size-4" />{film.frames.length}
+				{#if film.voice}<Icon name="mic" class="size-4" />{/if}
 			</span>
 		</div>
 		<p class="px-2 pt-2 pb-1 font-display font-semibold sm:px-3 sm:pt-2.5 sm:pb-1.5 sm:text-lg">

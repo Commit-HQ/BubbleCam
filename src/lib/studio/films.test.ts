@@ -90,6 +90,21 @@ describe('a film', () => {
 		expect(await films.holdFrame('a', 'gone', 1)).toBeUndefined();
 	});
 
+	it('keeps a voice, replaces it, and lets it go', async () => {
+		const sound = (text: string) => new Blob([text], { type: 'audio/webm' });
+		await films.createFilm(film('a'));
+		await films.addFrame('a', 'one', jpeg('1'), jpeg('t1'));
+		await films.setVoice('a', sound('hello'));
+		expect(await (await films.getFilm('a'))?.voice?.text()).toBe('hello');
+		// Whatever else changes, the voice stays.
+		await films.setFps('a', 12);
+		await films.addFrame('a', 'two', jpeg('2'), jpeg('t2'));
+		await films.setVoice('a', sound('again'));
+		expect(await (await films.getFilm('a'))?.voice?.text()).toBe('again');
+		await films.setVoice('a', undefined);
+		expect(await films.getFilm('a')).not.toHaveProperty('voice');
+	});
+
 	it('remembers its speed', async () => {
 		await films.createFilm(film('a'));
 		await films.setFps('a', 12);

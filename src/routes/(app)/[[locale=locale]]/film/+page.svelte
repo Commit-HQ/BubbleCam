@@ -13,6 +13,7 @@
 	import type { Film } from '#lib/studio/films.ts';
 	import { orientationOf } from '#lib/studio/geometry.ts';
 	import { heldAs, lockRotation, locksRotation } from '#lib/studio/rotation.ts';
+	import { wake } from '#lib/studio/sound.ts';
 	import { Studio } from '#lib/studio/studio.svelte.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
@@ -35,15 +36,23 @@
 	let asking = $state(false);
 	/** Whether the sliders for the zoom and the ghost's strength are open over the camera. */
 	let tools = $state(false);
-	const said = $derived(
-		studio.event?.type === 'taken'
-			? t.studio.taken(studio.event.count)
-			: studio.event?.type === 'moved'
-				? t.studio.moved(studio.event.count)
-				: studio.event
-					? t.studio.removed
-					: ''
-	);
+	const said = $derived.by(() => {
+		const event = studio.event;
+		switch (event?.type) {
+			case 'taken':
+				return t.studio.taken(event.count);
+			case 'removed':
+				return t.studio.removed;
+			case 'moved':
+				return t.studio.moved(event.count);
+			case 'voiced':
+				return t.studio.voiced;
+			case 'unvoiced':
+				return t.studio.unvoiced;
+			default:
+				return '';
+		}
+	});
 
 	/** The big button: a picture, or back to the camera from a picture or the film playing. */
 	function shutter() {
@@ -59,6 +68,8 @@
 	function save() {
 		studio.stopTimer();
 		studio.live();
+		// The tap is what lets a video that's recorded as the cartoon plays hear the cartoon's voice.
+		if (studio.voice) wake();
 		if (studio.settings.guardVideo) asking = true;
 		else void make();
 	}
@@ -136,7 +147,7 @@
 			if (document.visibilityState === 'visible') {
 				void awake();
 				if (studio.camera === 'off') void studio.startCamera();
-			} else studio.stopCamera();
+			} else studio.hide();
 		};
 		void awake();
 		document.addEventListener('visibilitychange', visibility);
@@ -168,7 +179,9 @@
 			aria-hidden="true"
 		>
 			<Icon name="film" class="size-5 text-sun" />{studio.frames.length}
+			{#if studio.voice}<Icon name="mic" class="size-5 text-sun" />{/if}
 		</p>
+		{#if studio.voice}<p class="sr-only">{t.studio.hasVoice}</p>{/if}
 		<div class="ml-auto flex items-center gap-2">
 			{#if studio.advanced}
 				<button

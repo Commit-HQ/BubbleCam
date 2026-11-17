@@ -48,6 +48,10 @@ export const en = {
 				copy: 'BubbleCam uses the camera only while a cartoon is open for shooting, once the browser has asked your permission. What the camera sees is never recorded or sent anywhere, apart from the pictures you take, which stay on the device.'
 			},
 			{
+				title: 'The microphone',
+				copy: 'BubbleCam uses the microphone only while you record a voice for a cartoon. The browser asks to allow it together with the camera, so recording isn’t interrupted later. The recorded voice stays on the device, with the pictures.'
+			},
+			{
 				title: 'No accounts, cookies, or tracking',
 				copy: 'There are no accounts, cookies, ads, or analytics. BubbleCam doesn’t know who uses it.'
 			},
@@ -78,7 +82,8 @@ export const en = {
 				'Pick a toy, put it in front of the camera, and press the red button. Cartoons stay on this device, so save the ones you love as videos.',
 			pictures,
 			/** A cartoon's card, for screen readers: when it was made and how long it is. */
-			open: (when: string, count: number) => `Cartoon from ${when}, ${pictures(count)}`,
+			open: (when: string, count: number, voiced: boolean) =>
+				`Cartoon from ${when}, ${pictures(count)}${voiced ? ', with a voice' : ''}`,
 			remove: 'Delete cartoon',
 			removeTitle: 'Delete this cartoon?',
 			removeCopy:
@@ -128,7 +133,7 @@ export const en = {
 			},
 			sounds: {
 				title: 'Sounds',
-				hint: 'The shutter’s click, and the pop of a picture being deleted.'
+				hint: 'The shutter’s click, and the pop of a picture being deleted. A cartoon’s voice plays either way.'
 			},
 			guard: {
 				title: 'Guard deleting',
@@ -181,6 +186,21 @@ export const en = {
 			hintNext: 'Now move it a tiny bit and snap again.',
 			taken: (count: number) => `Picture ${count} taken`,
 			removed: 'Picture deleted',
+			/** A voice recorded over the cartoon as it plays through once. */
+			record: 'Record a voice',
+			finishRecording: 'Finish recording',
+			removeVoice: 'Delete the voice',
+			recording: 'Recording…',
+			voiced: 'The voice is recorded',
+			unvoiced: 'The voice is deleted',
+			hasVoice: 'With a voice',
+			voiceProblems: {
+				denied:
+					'The microphone isn’t allowed. Allow it for this site in the browser’s settings, then try again.',
+				missing: 'No microphone found.',
+				busy: 'Another app is using the microphone. Close it, then try again.',
+				unsupported: 'This browser can’t record a voice.'
+			},
 			/** The advanced tools, which a grown-up turns on in the settings. */
 			tools: 'Zoom, ghost, grid, and self-timer',
 			zoom: 'Zoom',

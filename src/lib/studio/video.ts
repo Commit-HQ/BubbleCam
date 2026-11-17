@@ -1,11 +1,13 @@
 // Making a film into a video file to save or share. A worker encodes it faster than it plays (video.worker.ts).
-// A browser that can't encode video there, such as Safari before 16.4, records the film as it plays on a canvas
-// instead, with MediaRecorder, which takes as long as the film. Browser-only.
+// A browser that can't encode video there, such as Safari before 16.4, or can't encode the film's voice, records
+// the film as it plays on a canvas instead, with MediaRecorder, which takes as long as the film. Browser-only.
 
 import { getImage, type Film } from './films.ts';
 import { decode } from './decode.ts';
 import type { Quality } from './settings.ts';
+import { soundContext } from './sound.ts';
 import { timeline, type Turn } from './timeline.ts';
+import { voiceRate, voiceSamples } from './voice.ts';
 import type { VideoJob, VideoReply } from './video.worker.ts';
 
 export type Video = { blob: Blob; extension: 'mp4' | 'webm' };
@@ -43,8 +45,11 @@ const videoOf = (blob: Blob): Video => ({
 });
 
 /** Encodes in a worker, or resolves undefined where the browser can't. */
-function encode(film: Film, turns: Turn[], { progress, signal, quality }: Making) {
-	if (typeof Worker !== 'function') return Promise.resolve(undefined);
+async function encode(film: Film, turns: Turn[], { progress, signal, quality, loops }: Making) {
+	if (typeof Worker !== 'function') return undefined;
+	// A voice that can't be read is left out, rather than the video not being made.
+	const samples = film.voice && (await voiceSamples(film.voice).catch(() => undefined));
+	signal.throwIfAborted();
 	return new Promise<Video | undefined>((resolve, reject) => {
 		const worker = new Worker(new URL('./video.worker.ts', import.meta.url), { type: 'module' });
 		const end = () => {
@@ -73,9 +78,11 @@ function encode(film: Film, turns: Turn[], { progress, signal, quality }: Making
 			width: film.width,
 			height: film.height,
 			fps: film.fps,
-			quality
+			quality,
+			loops,
+			voice: samples && { samples, rate: voiceRate }
 		};
-		worker.postMessage(job);
+		worker.postMessage(job, samples ? [samples.buffer] : []);
 	});
 }
 
@@ -91,7 +98,7 @@ function recordedType() {
 async function record(
 	film: Film,
 	turns: Turn[],
-	{ progress, canvas, signal, quality }: Making
+	{ progress, canvas, signal, quality, loops }: Making
 ): Promise<Video> {
 	const type = recordedType();
 	if (!type || typeof canvas.captureStream !== 'function') throw new VideoUnsupported();
@@ -106,6 +113,14 @@ async function record(
 	let next = decode(getImage, turns[0].id);
 	draw(await next);
 	const stream = canvas.captureStream(film.fps);
+	// The film's voice plays into the recording, from its start in each round of the film.
+	const sound = film.voice ? soundContext() : undefined;
+	const voice =
+		sound && (await sound.decodeAudioData(await film.voice!.arrayBuffer()).catch(() => undefined));
+	const heard = voice && sound?.createMediaStreamDestination();
+	if (heard) stream.addTrack(heard.stream.getAudioTracks()[0]);
+	const round = turns.length / loops;
+	let speaking: AudioBufferSourceNode | undefined;
 	const recorder = new MediaRecorder(stream, {
 		mimeType: type,
 		videoBitsPerSecond: recordedBits[quality]
@@ -121,6 +136,13 @@ async function record(
 		for (let index = 0; index < turns.length; index++) {
 			if (index > 0) draw(await next);
 			if (index + 1 < turns.length) next = decode(getImage, turns[index + 1].id);
+			if (sound && voice && heard && index % round === 0) {
+				speaking?.stop();
+				speaking = sound.createBufferSource();
+				speaking.buffer = voice;
+				speaking.connect(heard);
+				speaking.start();
+			}
 			progress(index + 1);
 			shown += turns[index].turns;
 			// Wait for the picture's turns to end, measured from the start so delays don't add up.
@@ -130,6 +152,7 @@ async function record(
 			signal.throwIfAborted();
 		}
 	} finally {
+		speaking?.stop();
 		recorder.stop();
 		await stopped;
 		for (const track of stream.getTracks()) track.stop();

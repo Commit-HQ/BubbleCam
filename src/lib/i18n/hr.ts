@@ -49,6 +49,10 @@ export const hr: Messages = {
 				copy: 'BubbleCam koristi kameru samo dok je crtić otvoren za snimanje, i to nakon što preglednik zatraži vaše dopuštenje. Ono što kamera vidi nigdje se ne snima niti šalje, osim sličica koje snimite, a one ostaju na uređaju.'
 			},
 			{
+				title: 'Mikrofon',
+				copy: 'BubbleCam koristi mikrofon samo dok snimate glas za crtić. Preglednik dopuštenje za mikrofon traži zajedno s onim za kameru, da se snimanje poslije ne prekida. Snimljeni glas ostaje na uređaju, uz sličice.'
+			},
+			{
 				title: 'Bez računa, kolačića i praćenja',
 				copy: 'Nema računa, kolačića, oglasa ni analitike. BubbleCam ne zna tko ga koristi.'
 			},
@@ -78,7 +82,8 @@ export const hr: Messages = {
 			intro:
 				'Odaberi igračku, stavi je pred kameru i pritisni crveni gumb. Crtići ostaju na ovom uređaju, pa one najdraže spremi kao video.',
 			pictures,
-			open: (when: string, count: number) => `Crtić od ${when}, ${pictures(count)}`,
+			open: (when: string, count: number, voiced: boolean) =>
+				`Crtić od ${when}, ${pictures(count)}${voiced ? ', s glasom' : ''}`,
 			remove: 'Obriši crtić',
 			removeTitle: 'Obrisati ovaj crtić?',
 			removeCopy:
@@ -127,7 +132,7 @@ export const hr: Messages = {
 			},
 			sounds: {
 				title: 'Zvukovi',
-				hint: 'Škljocaj pri snimanju i pucanj balončića pri brisanju sličice.'
+				hint: 'Škljocaj pri snimanju i pucanj balončića pri brisanju sličice. Glas crtića čuje se i kad su isključeni.'
 			},
 			guard: {
 				title: 'Zaštita brisanja',
@@ -180,6 +185,20 @@ export const hr: Messages = {
 			hintNext: 'Sad je malo pomakni i opet škljocni.',
 			taken: (count: number) => `Snimljena je ${count}. sličica`,
 			removed: 'Sličica je obrisana',
+			record: 'Snimi glas',
+			finishRecording: 'Završi snimanje',
+			removeVoice: 'Obriši glas',
+			recording: 'Snimam…',
+			voiced: 'Glas je snimljen',
+			unvoiced: 'Glas je obrisan',
+			hasVoice: 'S glasom',
+			voiceProblems: {
+				denied:
+					'Mikrofon nije dopušten. Dopusti ga za ovu stranicu u postavkama preglednika, pa pokušaj ponovno.',
+				missing: 'Nema mikrofona.',
+				busy: 'Neka druga aplikacija koristi mikrofon. Zatvori je, pa pokušaj ponovno.',
+				unsupported: 'Ovaj preglednik ne može snimati glas.'
+			},
 			tools: 'Zum, duh, mreža i samookidač',
 			zoom: 'Zum',
 			ghostStrength: 'Jačina duha',

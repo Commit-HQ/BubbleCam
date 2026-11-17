@@ -6,6 +6,7 @@
 	import { fit } from '#lib/studio/geometry.ts';
 	import { ghostRange, holdRange, timerChoices, zoomRange } from '#lib/studio/settings.ts';
 	import type { Studio } from '#lib/studio/studio.svelte.ts';
+	import { recordsVoice } from '#lib/studio/voice.ts';
 	import SpeedPicker from './SpeedPicker.svelte';
 
 	// The picture: the camera, with the ghost of the last picture over it, or a picture taken earlier, or the
@@ -17,6 +18,10 @@
 	// buttons for a grid that divides the picture in thirds and for the self-timer, whose countdown shows big in
 	// the middle; and a picture being looked at has arrows that move it earlier or later in the film, and a
 	// slider that holds it on screen for a few seconds when the film plays.
+	//
+	// While the film plays, a microphone beside the speeds records a voice over it: the film then plays through
+	// once, after a countdown, and the same button ends the recording sooner. A film with a voice has a bin
+	// beside the microphone, which takes the voice away.
 	let {
 		studio,
 		t,
@@ -56,12 +61,18 @@
 		timerChoices[(timerChoices.indexOf(studio.timer) + 1) % timerChoices.length]
 	);
 
+	const voiceButton =
+		'grid size-14 place-items-center rounded-full text-white transition hover:bg-white/15 active:scale-90 motion-reduce:active:scale-100';
 	const toolButton =
 		'grid h-12 min-w-12 place-items-center rounded-full px-2 text-white transition hover:bg-white/15 active:scale-90 aria-pressed:bg-sky aria-pressed:text-night motion-reduce:active:scale-100';
 	const moveButton =
 		'grid size-12 place-items-center rounded-full text-white transition hover:bg-white/15 active:scale-90 aria-disabled:opacity-30 motion-reduce:active:scale-100';
 
+	/** Whether this browser can record a voice. */
+	let records = $state(false);
+
 	onMount(() => {
+		records = recordsVoice();
 		studio.attach(video, ghost, screen);
 	});
 </script>
@@ -275,8 +286,49 @@
 				</label>
 			{/if}
 		{:else if studio.mode === 'play'}
-			<div class="absolute inset-x-0 bottom-3 flex justify-center">
-				<SpeedPicker speed={studio.speed} {t} onchange={(speed) => studio.setSpeed(speed)} />
+			{#if studio.recording}
+				<p
+					class="absolute top-3 left-3 inline-flex items-center gap-2 rounded-full bg-night/70 px-4 py-2 font-display font-semibold backdrop-blur-md"
+				>
+					<span class="size-3 rounded-full bg-coral motion-safe:animate-pulse"></span>{t.recording}
+				</p>
+			{:else if studio.voiceProblem}
+				<p
+					class="absolute inset-x-3 top-3 mx-auto w-fit max-w-[90%] rounded-3xl bg-night/80 px-4 py-2 text-center font-medium ring-1 ring-white/15 backdrop-blur-md"
+					role="status"
+				>
+					{t.voiceProblems[studio.voiceProblem]}
+				</p>
+			{/if}
+			<div class="absolute inset-x-3 bottom-3 flex flex-wrap items-center justify-center gap-2">
+				{#if !studio.recording && !studio.counting}
+					<SpeedPicker speed={studio.speed} {t} onchange={(speed) => studio.setSpeed(speed)} />
+				{/if}
+				{#if records}
+					<div
+						class="flex gap-1 rounded-full bg-night/70 p-1.5 ring-1 ring-white/15 backdrop-blur-md"
+					>
+						<button
+							type="button"
+							class="{voiceButton} aria-pressed:bg-coral"
+							aria-label={studio.recording ? t.finishRecording : t.record}
+							aria-pressed={studio.recording}
+							onclick={() => (studio.recording ? studio.finishRecording() : studio.record())}
+						>
+							<Icon name="mic" class="size-7" />
+						</button>
+						{#if studio.voice && !studio.recording && !studio.counting}
+							<button
+								type="button"
+								class={voiceButton}
+								aria-label={t.removeVoice}
+								onclick={() => studio.removeVoice()}
+							>
+								<Icon name="trash2" class="size-6" />
+							</button>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 

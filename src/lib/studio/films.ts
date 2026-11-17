@@ -1,6 +1,7 @@
 // The cartoons a device keeps, in IndexedDB, which pages and workers share: each film's record, and each of its
 // pictures as two JPEG files, the picture itself and its thumbnail for the strip. Records and files are in
-// separate stores, so opening a film reads its small thumbnails and never every full picture. Nothing here
+// separate stores, so opening a film reads its small thumbnails and never every full picture. A film's voice,
+// one recording, is part of its record: the browser reads such a file only when it's played. Nothing here
 // leaves the device.
 //
 // Every change is one transaction: a picture's files arrive together with its place in the film, so a film
@@ -21,6 +22,8 @@ export type Film = {
 	frames: string[];
 	/** How long a picture is held on screen beyond its turn, in seconds, by its ID. Most films hold none. */
 	holds?: Record<string, number>;
+	/** A voice recorded over the film as it played, in whatever sound file the browser records. */
+	voice?: Blob;
 };
 
 const name = 'bubblecam';
@@ -178,6 +181,15 @@ export function orderFrames(filmId: string, order: string[]) {
 		if (frames.every((id, index) => id === film.frames[index])) return undefined;
 		return { ...film, frames, updated: Date.now() };
 	});
+}
+
+/** Gives a film its voice, in place of any it had, or takes its voice away with none. */
+export function setVoice(filmId: string, voice: Blob | undefined) {
+	return changeFilm(filmId, ({ voice: _, ...film }) => ({
+		...film,
+		...(voice && { voice }),
+		updated: Date.now()
+	}));
 }
 
 /** Sets how many pictures a film shows in a second. */

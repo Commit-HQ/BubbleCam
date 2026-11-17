@@ -17,25 +17,50 @@ export class CameraError extends Error {
  * Opens the camera that faces the given way, or the only one there is. It asks for a picture `long` pixels
  * long, 720p unless a grown-up chose otherwise, which is all a film keeps (geometry.ts), so phones don't spend
  * battery on a bigger picture.
+ *
+ * When the browser is about to ask whether the camera is allowed, the microphone is asked for with it, so
+ * recording a voice later doesn't stop to ask again. The microphone is let go at once: it's only on while a
+ * voice is recorded (voice.ts). Without a microphone, or where both are refused, the camera is asked for alone.
  */
 export async function openCamera(facing: Facing, long = longSide): Promise<MediaStream> {
 	if (!navigator.mediaDevices?.getUserMedia) throw new CameraError('unsupported');
+	const video = {
+		facingMode: { ideal: facing },
+		width: { ideal: long },
+		height: { ideal: (long * 9) / 16 },
+		frameRate: { ideal: 30 }
+	};
 	try {
-		return await navigator.mediaDevices.getUserMedia({
-			audio: false,
-			video: {
-				facingMode: { ideal: facing },
-				width: { ideal: long },
-				height: { ideal: (long * 9) / 16 },
-				frameRate: { ideal: 30 }
+		if (await asksFirst()) {
+			try {
+				const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+				for (const track of stream.getAudioTracks()) {
+					track.stop();
+					stream.removeTrack(track);
+				}
+				return stream;
+			} catch {
+				// The camera alone, below.
 			}
-		});
+		}
+		return await navigator.mediaDevices.getUserMedia({ audio: false, video });
 	} catch (error) {
 		throw new CameraError(problemOf(error));
 	}
 }
 
-function problemOf(error: unknown): CameraProblem {
+/** Whether the browser will ask the person before it opens the camera. Browsers that don't say aren't asked. */
+async function asksFirst() {
+	try {
+		const camera = await navigator.permissions.query({ name: 'camera' as PermissionName });
+		return camera.state === 'prompt';
+	} catch {
+		return false;
+	}
+}
+
+/** Why a camera or a microphone couldn't be opened, from the browser's error. */
+export function problemOf(error: unknown): CameraProblem {
 	switch (error instanceof DOMException ? error.name : '') {
 		case 'NotAllowedError':
 		case 'SecurityError':

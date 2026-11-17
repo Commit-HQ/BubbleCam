@@ -2,7 +2,8 @@
 // few of them are decoded ahead of the one on screen and let go once shown; a short film is kept decoded whole,
 // so it loops without decoding anything again. If a slow device hasn't decoded the next picture in time, the
 // one on screen simply stays a little longer, as it would on a film projector. A picture that's held stays for
-// its seconds beyond its turn. Browser-only.
+// its seconds beyond its turn. A film can also play through just once, for a voice to be recorded over it.
+// Browser-only.
 
 import { decode } from './decode.ts';
 
@@ -15,6 +16,9 @@ export class Player {
 	#frames: string[] = [];
 	#fps = 8;
 	#holds: Record<string, number> = {};
+	/** Whether the film plays through once, and whether its last picture has been shown. */
+	#once = false;
+	#last = false;
 	/** Decoded pictures by their place in the film, or null for one that couldn't be read, which is skipped. */
 	#ready = new Map<number, ImageBitmap | null>();
 	#loading = new Set<number>();
@@ -25,6 +29,8 @@ export class Player {
 	#run = 0;
 	/** Called with each picture's place in the film as it shows. */
 	onshow: ((index: number) => void) | undefined;
+	/** Called when a film that plays once has shown its last picture for its turn. */
+	onend: (() => void) | undefined;
 
 	constructor(canvas: HTMLCanvasElement, load: (frameId: string) => Promise<Blob | undefined>) {
 		this.#canvas = canvas;
@@ -32,15 +38,17 @@ export class Player {
 	}
 
 	/**
-	 * Plays `frames` at `fps` pictures a second, until stopped. `holds` says how many seconds longer a picture
-	 * stays, by its ID.
+	 * Plays `frames` at `fps` pictures a second, round and round until stopped, or through `once`. `holds` says
+	 * how many seconds longer a picture stays, by its ID.
 	 */
-	play(frames: string[], fps: number, holds: Record<string, number> = {}) {
+	play(frames: string[], fps: number, holds: Record<string, number> = {}, once = false) {
 		this.stop();
 		if (!frames.length) return;
 		this.#frames = frames;
 		this.#fps = fps;
 		this.#holds = holds;
+		this.#once = once;
+		this.#last = false;
 		this.#index = 0;
 		this.#due = performance.now();
 		this.#prefetch();
@@ -63,11 +71,16 @@ export class Player {
 	#tick = (now: number) => {
 		this.#frame = requestAnimationFrame(this.#tick);
 		if (now < this.#due) return;
+		if (this.#last) {
+			this.stop();
+			return this.onend?.();
+		}
 		const count = this.#frames.length;
 		const picture = this.#ready.get(this.#index);
 		if (picture === undefined) return;
 		const shown = this.#index;
 		this.#index = (shown + 1) % count;
+		this.#last = this.#once && shown === count - 1;
 		if (picture) {
 			const context = this.#canvas.getContext('2d')!;
 			if (this.#canvas.width !== picture.width) this.#canvas.width = picture.width;

@@ -3,7 +3,11 @@
 // encoded. Every change to the device's films waits for the ones before it (`#write`), so they're saved in the
 // order they were made: a picture deleted just after it was taken is deleted after it's saved, and a film is
 // played or made into a video only once every picture in it can be read back. What a grown-up set for the studio
-// (settings.ts) is read once, as it opens. Browser-only.
+// (settings.ts) is read once, as it opens.
+//
+// A film can have a voice, recorded while it plays through once (voice.ts). The camera stops for the recording
+// and starts again on the way back to it: a phone doesn't always keep a camera and a microphone, opened one
+// after the other, both going. Browser-only.
 
 import { decode } from './decode.ts';
 import {
@@ -26,6 +30,7 @@ import {
 	keepFilms,
 	orderFrames,
 	setFps,
+	setVoice,
 	type Film
 } from './films.ts';
 import { coverCrop, filmSize, zoomCrop, type Size } from './geometry.ts';
@@ -42,7 +47,8 @@ import {
 	type Settings
 } from './settings.ts';
 import { Shutter } from './shutter.ts';
-import { click, mute, pop, tap, tick } from './sound.ts';
+import { click, decodeVoice, hush, listen, mute, pop, speak, tap, tick, wake } from './sound.ts';
+import { openMicrophone, VoiceRecorder } from './voice.ts';
 
 /** The three speeds a child picks from, in pictures a second. */
 export const speeds = { slow: 5, walk: 8, fast: 12 } as const;
@@ -65,7 +71,10 @@ export type Mode = 'live' | 'review' | 'play';
 export type CameraState = 'off' | 'starting' | 'on' | CameraProblem;
 
 /** What just happened, for screen readers. */
-export type Event = { type: 'taken' | 'removed' | 'moved'; count: number };
+export type Event = { type: 'taken' | 'removed' | 'moved' | 'voiced' | 'unvoiced'; count: number };
+
+/** How many seconds are counted down before a voice is recorded: time to draw breath. */
+const voiceCountdown = 3;
 
 /** Where the device remembers which camera the studio used last. */
 const facingKey = 'bubblecam:facing';
@@ -117,8 +126,14 @@ export class Studio {
 	 * big button stops them. Off whenever the studio opens, so a series never starts by surprise.
 	 */
 	again = $state(false);
-	/** The seconds left of a countdown under way, or 0. */
+	/** The seconds left of a countdown under way, to a picture or to recording a voice, or 0. */
 	counting = $state(0);
+	/** The film's voice, if one was recorded over it. */
+	voice = $state.raw<Blob>();
+	/** Whether a voice is being recorded, while the film plays through once. */
+	recording = $state(false);
+	/** Why a voice couldn't be recorded, when the microphone was asked for and didn't open. */
+	voiceProblem = $state<CameraProblem>();
 	/** How long each held picture stays on screen beyond its turn, in seconds, by its ID. */
 	holds = $state<Record<string, number>>({});
 	/** How far the camera's picture is zoomed in: 1 is the whole of it. */
@@ -157,6 +172,15 @@ export class Studio {
 	/** When the big button has rested from its last press, by the page's clock. */
 	#rested = 0;
 	#countdown: ReturnType<typeof setTimeout> | undefined;
+	/** The recorder while a voice is recorded, and the microphone from when it opens until the recorder has it. */
+	#recorder: VoiceRecorder | undefined;
+	#microphone: MediaStream | undefined;
+	/** Counts recordings begun and ended, so a microphone that opens late for one given up is let go. */
+	#takes = 0;
+	/** Whether a voice is on its way to being recorded or is being recorded, from the tap to the end. */
+	#voicing = false;
+	/** The voice decoded for playing, with the file it was decoded from. */
+	#spoken: { voice: Blob; sound: AudioBuffer | undefined } | undefined;
 	/** Called when a new film gets its ID, with its first picture. */
 	onstart: ((id: string) => void) | undefined;
 
@@ -179,9 +203,10 @@ export class Studio {
 	async load(id: string | null) {
 		const film = id ? await getFilm(id).catch(() => undefined) : undefined;
 		if (film) {
-			const { frames, holds, ...rest } = film;
+			const { frames, holds, voice, ...rest } = film;
 			this.film = rest;
 			this.holds = holds ?? {};
+			this.voice = voice;
 			this.speed = speedOf(film.fps);
 			const thumbs = await getThumbs(frames);
 			this.frames = frames.map((frame) => ({ id: frame, thumb: addressOf(thumbs.get(frame)) }));
@@ -196,7 +221,16 @@ export class Studio {
 		this.#ghost = ghost;
 		this.#screen = screen;
 		this.#player = new Player(screen, getImage);
-		this.#player.onshow = (index) => (this.showing = index);
+		this.#player.onshow = (index) => {
+			this.showing = index;
+			if (index !== 0) return;
+			// The film's first picture: a recording starts with it, and a voice starts over with each round.
+			if (this.#recorder && !this.recording) {
+				this.#recorder.start();
+				this.recording = true;
+			} else if (!this.#recorder && this.#spoken?.sound) speak(this.#spoken.sound);
+		};
+		this.#player.onend = () => void this.#endRecording(true);
 		// Turning a phone turns the camera's picture with it.
 		video.addEventListener('resize', () => {
 			if (video.videoWidth) this.source = { width: video.videoWidth, height: video.videoHeight };
@@ -241,7 +275,16 @@ export class Studio {
 		return this.settings.shape === 'auto' ? long : Math.max(long, 1920);
 	}
 
-	/** Lets the camera go, as when the app goes into the background, which stops it anyway. */
+	/**
+	 * The app goes into the background, which stops the camera and the microphone anyway: the camera is let go,
+	 * and a voice being recorded is given up, back at the camera.
+	 */
+	hide() {
+		if (this.#voicing) this.live();
+		this.stopCamera();
+	}
+
+	/** Lets the camera go. */
 	stopCamera() {
 		this.stopTimer();
 		this.#starts++;
@@ -274,7 +317,7 @@ export class Studio {
 		if (now < this.#rested || !this.#ready()) return;
 		this.#rested = now + this.rest;
 		if (this.counting) this.stopTimer();
-		else if (this.timer) this.#count(this.timer);
+		else if (this.timer) this.#countToPicture();
 		else this.#take();
 	}
 
@@ -288,14 +331,21 @@ export class Studio {
 		);
 	}
 
-	/** Counts the seconds down to a picture, with a tick for each, and again after it where that's asked. */
-	#count(left: number) {
+	/** Counts the seconds down to a picture, and again after it where that's asked. */
+	#countToPicture() {
+		this.#count(this.timer, () => {
+			if (this.#take() && this.again && this.timer) this.#countToPicture();
+		});
+	}
+
+	/** Counts seconds down, with a tick for each, and then does what was counted down to. */
+	#count(left: number, then: () => void) {
 		this.counting = left;
 		tick();
 		this.#countdown = setTimeout(() => {
-			if (left > 1) return this.#count(left - 1);
+			if (left > 1) return this.#count(left - 1, then);
 			this.counting = 0;
-			if (this.#take() && this.again && this.timer) this.#count(this.timer);
+			then();
 		}, 1000);
 	}
 
@@ -473,8 +523,7 @@ export class Studio {
 	/** Shows one picture taken earlier, big, in place of the camera. */
 	select(index: number) {
 		if (!this.frames[index]) return;
-		this.stopTimer();
-		this.#player?.stop();
+		this.#stopPlaying();
 		this.mode = 'review';
 		this.selected = index;
 		this.showing = -1;
@@ -492,24 +541,144 @@ export class Studio {
 
 	/** Back to the camera. */
 	live() {
-		this.#player?.stop();
+		this.#stopPlaying();
 		this.mode = 'live';
 		this.selected = -1;
 		this.showing = -1;
+		// The camera stopped if a voice was recorded.
+		if (this.camera === 'off' && !this.#closed) void this.startCamera();
+	}
+
+	/** Stops the film and its voice, a countdown, and a recording under way, which is given up. */
+	#stopPlaying() {
+		this.stopTimer();
+		void this.#endRecording(false);
+		this.#player?.stop();
+		hush();
 	}
 
 	/** Plays the film, round and round, once every picture in it can be read. */
 	play() {
 		if (this.frames.length < 2) return;
-		this.stopTimer();
-		this.#player?.stop();
+		this.#stopPlaying();
 		this.mode = 'play';
 		this.selected = -1;
+		this.voiceProblem = undefined;
 		const ids = this.frames.map((frame) => frame.id);
 		const holds = $state.snapshot(this.holds);
+		const voice = this.voice;
+		// The tap that plays the film is what lets its voice be heard, a moment later.
+		if (voice) wake();
 		this.#write(async () => {
-			if (this.mode === 'play') this.#player?.play(ids, speeds[this.speed], holds);
+			if (voice && this.#spoken?.voice !== voice) {
+				this.#spoken = { voice, sound: await decodeVoice(voice) };
+			}
+			if (!voice) this.#spoken = undefined;
+			if (this.mode === 'play' && !this.#voicing)
+				this.#player?.play(ids, speeds[this.speed], holds);
 		});
+	}
+
+	/**
+	 * Records a voice over the film: after a short countdown, the film plays through once while the microphone
+	 * listens, and what was said becomes the film's voice, in place of any it had. `finishRecording` ends it
+	 * sooner and keeps what was said so far; anything else that stops the film gives it up.
+	 */
+	async record() {
+		const film = this.film;
+		if (!film || this.frames.length < 2 || this.#voicing) return;
+		this.#stopPlaying();
+		this.#voicing = true;
+		this.mode = 'play';
+		this.selected = -1;
+		this.showing = -1;
+		this.voiceProblem = undefined;
+		this.stopCamera();
+		const take = ++this.#takes;
+		const ids = this.frames.map((frame) => frame.id);
+		const holds = $state.snapshot(this.holds);
+		const first = decode(getImage, ids[0]);
+		try {
+			listen(true);
+			const microphone = await openMicrophone();
+			// Given up while the browser was asking.
+			if (take !== this.#takes || this.mode !== 'play') {
+				closeCamera(microphone);
+				return void first.then((picture) => picture?.close());
+			}
+			this.#microphone = microphone;
+		} catch (error) {
+			listen(false);
+			void first.then((picture) => picture?.close());
+			if (take !== this.#takes) return;
+			// The film plays on, with why it has no voice yet.
+			this.#voicing = false;
+			this.play();
+			this.voiceProblem = error instanceof CameraError ? error.problem : 'unsupported';
+			return;
+		}
+		// The film's first picture waits on screen while the seconds are counted down.
+		const picture = await first;
+		if (picture && this.#screen && take === this.#takes) draw(this.#screen, picture);
+		picture?.close();
+		if (take !== this.#takes) return;
+		this.#count(voiceCountdown, () => {
+			const microphone = this.#microphone;
+			if (!microphone) return;
+			this.#microphone = undefined;
+			try {
+				this.#recorder = new VoiceRecorder(microphone);
+			} catch {
+				closeCamera(microphone);
+				listen(false);
+				this.#voicing = false;
+				this.play();
+				this.voiceProblem = 'unsupported';
+				return;
+			}
+			// The recorder starts with the first picture (`attach`), and the film's end ends it.
+			this.#player?.play(ids, speeds[this.speed], holds, true);
+		});
+	}
+
+	/** Ends a recording before the film does, and keeps what was said so far. */
+	finishRecording() {
+		if (!this.recording) return;
+		this.#player?.stop();
+		void this.#endRecording(true);
+	}
+
+	/** Ends a recording, or the wait for one, and lets the microphone go. A voice that's kept is then played. */
+	async #endRecording(keep: boolean) {
+		this.#takes++;
+		this.#voicing = false;
+		closeCamera(this.#microphone);
+		this.#microphone = undefined;
+		const recorder = this.#recorder;
+		this.#recorder = undefined;
+		this.recording = false;
+		if (!recorder) return listen(false);
+		const voice = await recorder.stop();
+		listen(false);
+		const film = this.film;
+		if (!keep || !voice?.size || !film) return;
+		this.voice = voice;
+		this.event = { type: 'voiced', count: this.frames.length };
+		this.#write(() => setVoice(film.id, voice));
+		if (this.mode === 'play') this.play();
+	}
+
+	/** Takes the film's voice away. */
+	removeVoice() {
+		const film = this.film;
+		if (!film || !this.voice || this.#recorder) return;
+		this.voice = undefined;
+		this.#spoken = undefined;
+		hush();
+		this.event = { type: 'unvoiced', count: this.frames.length };
+		pop();
+		tap();
+		this.#write(() => setVoice(film.id, undefined));
 	}
 
 	setSpeed(speed: Speed) {
@@ -529,7 +698,8 @@ export class Studio {
 			film && {
 				...$state.snapshot(film),
 				frames: this.frames.map((frame) => frame.id),
-				holds: $state.snapshot(this.holds)
+				holds: $state.snapshot(this.holds),
+				voice: this.voice
 			}
 		);
 	}
@@ -537,7 +707,7 @@ export class Studio {
 	/** Closes the studio. Pictures still being encoded or saved finish first. */
 	close() {
 		this.#closed = true;
-		this.#player?.stop();
+		this.#stopPlaying();
 		this.stopCamera();
 		const thumbs = this.frames.map((frame) => frame.thumb);
 		void this.#writes.finally(() => {

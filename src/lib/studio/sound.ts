@@ -1,5 +1,6 @@
 // The studio's little sounds, made on the spot with Web Audio rather than played from files: a camera's click
-// for each picture, a soap bubble's pop when one is deleted, and a tick for each second of the self-timer. Phones on silent stay quiet in Safari, which
+// for each picture, a soap bubble's pop when one is deleted, and a tick for each second of the self-timer. A
+// film's voice plays through the same output, so it needs no tap of its own to be heard. Phones on silent stay quiet in Safari, which
 // otherwise plays Web Audio regardless, and the sounds mix with, rather than stop, music playing nearby.
 // Sounds are a nicety: anything that goes wrong is ignored. Browser-only.
 
@@ -12,15 +13,80 @@ export function mute(off: boolean) {
 	quiet = off;
 }
 
+/** Safari's say in how the page's sound sits beside other sound, which other browsers don't have. */
+const session = () => (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+
 /** The audio context, made on the first tap, as browsers require. */
 function audio() {
 	if (!context) {
-		const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
-		if (session) session.type = 'ambient';
+		const safari = session();
+		if (safari) safari.type = 'ambient';
 		context = new AudioContext();
 	}
 	if (context.state === 'suspended') void context.resume();
 	return context;
+}
+
+/** The page's sound output, for a film's voice played into a video that's recorded as the film plays. */
+export function soundContext() {
+	return audio();
+}
+
+/** Gets the sound ready during a tap, so a voice can play a moment later, when it has been read. */
+export function wake() {
+	try {
+		audio();
+	} catch {
+		// Silence is fine.
+	}
+}
+
+/**
+ * Lets the microphone be heard while a voice is recorded, and goes back to sounds that mix with others after:
+ * Safari gives the microphone nothing while the page only plays along.
+ */
+export function listen(on: boolean) {
+	try {
+		const safari = session();
+		if (safari) safari.type = on ? 'play-and-record' : 'ambient';
+	} catch {
+		// Other browsers listen anyway.
+	}
+}
+
+/** A film's voice, decoded for playing. */
+export async function decodeVoice(voice: Blob): Promise<AudioBuffer | undefined> {
+	try {
+		return await audio().decodeAudioData(await voice.arrayBuffer());
+	} catch {
+		return undefined;
+	}
+}
+
+let speaking: AudioBufferSourceNode | undefined;
+
+/** Plays a film's voice from its start, in place of one that's playing. Turning the sounds off leaves it on. */
+export function speak(voice: AudioBuffer) {
+	hush();
+	try {
+		const sound = audio();
+		speaking = sound.createBufferSource();
+		speaking.buffer = voice;
+		speaking.connect(sound.destination);
+		speaking.start();
+	} catch {
+		// Silence is fine.
+	}
+}
+
+/** Stops the voice. */
+export function hush() {
+	try {
+		speaking?.stop();
+	} catch {
+		// It had ended by itself.
+	}
+	speaking = undefined;
 }
 
 /** A short burst of white noise, the stuff a shutter's click is made of. */

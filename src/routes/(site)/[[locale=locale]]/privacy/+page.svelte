@@ -8,7 +8,7 @@
 	// What BubbleCam keeps and where, as the code does it. Keep it in step with any change that alters that.
 	let { data }: PageProps = $props();
 	const t = $derived(messages[data.locale].privacyPolicy);
-	const icons: IconName[] = ['image', 'camera', 'shieldCheck', 'globe', 'trash2'];
+	const icons: IconName[] = ['image', 'camera', 'mic', 'shieldCheck', 'globe', 'trash2'];
 </script>
 
 <svelte:head>
