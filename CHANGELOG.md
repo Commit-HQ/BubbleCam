@@ -2,6 +2,10 @@
 
 What's new in each version of BubbleCam, newest first. The version a page was built from is in the footer of the landing pages and the cartoons' page.
 
+## 0.3.1 (2026-11-17)
+
+- In the settings, the advanced tools come right after the cartoon's shape.
+
 ## 0.3.0 (2026-11-17)
 
 A voice for the toys.
