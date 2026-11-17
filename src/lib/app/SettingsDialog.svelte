@@ -94,6 +94,12 @@
 				value={settings.shape}
 				onchange={(shape) => set('shape', shape)}
 			/>
+			<Switch
+				title={t.settings.advanced.title}
+				hint={t.settings.advanced.hint}
+				checked={settings.advanced}
+				onchange={(advanced) => set('advanced', advanced)}
+			/>
 			{#if locks}
 				<Switch
 					title={t.settings.lock.title}
@@ -149,12 +155,6 @@
 				options={qualities.map((value) => ({ value, label: t.settings.video.options[value] }))}
 				value={settings.video}
 				onchange={(video) => set('video', video)}
-			/>
-			<Switch
-				title={t.settings.advanced.title}
-				hint={t.settings.advanced.hint}
-				checked={settings.advanced}
-				onchange={(advanced) => set('advanced', advanced)}
 			/>
 		</div>
 		<div class="flex justify-end">
