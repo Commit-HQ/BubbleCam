@@ -31,7 +31,7 @@ The camera needs a secure context. On the computer running the server, `localhos
 
 The development server has no service worker, so the app doesn't work offline there. Measure performance, for example with Lighthouse, on a production build (`npm run build && npm run preview`): development performance is not representative. The privacy and app pages should score 100 in all four categories, on mobile and desktop; the [architecture notes](architecture.md#speed) say what keeps it there. The 404 pages ask search engines not to index them, which the SEO score counts against them.
 
-`npm test` covers what the code guarantees rather than component markup: the shape and size of pictures, the cartoons kept in IndexedDB (in Node, with `fake-indexeddb`), paths, both dictionaries, the CSP's hash of SvelteKit's announcer, and the changelog. The camera, the encoders, and the service worker need a browser: before a release, shoot a cartoon on a real phone or tablet, play it, make its video, and open the app again without a network.
+`npm test` covers what the code guarantees rather than component markup: the shape and size of pictures, the cartoons kept in IndexedDB (in Node, with `fake-indexeddb`), the settings and the sum that guards them, paths, both dictionaries, the CSP's hash of SvelteKit's announcer, and the changelog. The camera, the encoders, and the service worker need a browser: before a release, shoot a cartoon on a real phone or tablet, play it, make its video, and open the app again without a network. With the advanced tools on, drag a picture to another place with a finger, let the self-timer take a few pictures by itself, and on an Android phone check that the screen stays as the cartoon when it's kept from turning.
 
 ## Pictures
 

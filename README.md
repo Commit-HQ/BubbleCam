@@ -24,12 +24,14 @@ BubbleCam is a sister of [BubbleBoard](https://github.com/Commit-HQ/BubbleBoard)
 ## What it does
 
 - 👻 **A ghost of the last picture** over the camera, so every nudge lines up.
-- 🔴 **One big red button.** Pictures are kept the moment they're taken, so kids can snap as fast as they like.
+- 🔴 **One big red button.** A picture is kept the moment it's taken, and the button rests a moment after it, so one press is one picture.
 - 🎞️ **A strip of pictures** to look back at, and a bin that takes the last one away.
 - ▶️ **Play, at three speeds:** a turtle, footsteps, and a rabbit, which kids read without words.
 - 🎬 **A video for the family:** one tap makes an MP4 to save or share.
 - 📴 **Works without the internet**, once it has been opened, and installs on phones, tablets, and computers.
 - 🔒 **Everything stays on the device**, in the browser's storage. There's no server that could see it.
+- ⚙️ **Settings for grown-ups**, behind a sum from the times table: the cartoon's shape, the button's pause, sounds, picture and video quality, and the same sum before deleting a cartoon or making a video.
+- 🧰 **Advanced tools**, off until a grown-up wants them: zoom, the ghost's strength, a grid, a self-timer that can keep going by itself, moving and holding pictures, and a video that repeats.
 - 🌍 **Croatian and English.**
 
 ## Run it locally
