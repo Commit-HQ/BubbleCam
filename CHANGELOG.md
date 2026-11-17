@@ -2,6 +2,14 @@
 
 What's new in each version of BubbleCam, newest first. The version a page was built from is in the footer of the landing pages and the cartoons' page.
 
+## 0.3.0 (2026-11-17)
+
+A voice for the toys.
+
+- A cartoon can have a voice: a microphone beside the speeds records it while the cartoon plays through once, after a countdown of three. The same button ends the recording sooner, a new recording takes the old one's place, and a bin beside the microphone takes the voice away.
+- The voice plays with the cartoon and is in its video, starting over each time a video plays the cartoon again.
+- The browser asks for the camera and the microphone together the first time, so recording a voice doesn't stop to ask. The microphone is on only while a voice is recorded, and the privacy page says so.
+
 ## 0.2.0 (2026-11-17)
 
 Settings for grown-ups, and a button that's harder to press twice.
