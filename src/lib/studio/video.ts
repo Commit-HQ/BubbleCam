@@ -4,23 +4,37 @@
 
 import { getImage, type Film } from './films.ts';
 import { decode } from './decode.ts';
+import type { Quality } from './settings.ts';
+import { timeline, type Turn } from './timeline.ts';
 import type { VideoJob, VideoReply } from './video.worker.ts';
 
 export type Video = { blob: Blob; extension: 'mp4' | 'webm' };
 
 type Making = {
-	/** Called as each picture is done, with how many are. */
+	/** How many times the video plays the film: once, unless a grown-up chose more. */
+	loops: number;
+	/** Called as each picture is done, with how many are, of the film's pictures times `loops`. */
 	progress: (done: number) => void;
 	/** A canvas on the page, which the film plays on if it has to be recorded as it plays. */
 	canvas: HTMLCanvasElement;
 	signal: AbortSignal;
+	/** How finely the video is encoded: "normal" unless a grown-up chose otherwise. */
+	quality: Quality;
+};
+
+/** What a recorded video may weigh, in bits a second, where the browser's recorder makes it. */
+const recordedBits: Record<Quality, number> = {
+	small: 2_500_000,
+	normal: 5_000_000,
+	high: 10_000_000
 };
 
 export class VideoUnsupported extends Error {}
 
 export async function makeVideo(film: Film, making: Making): Promise<Video> {
-	const encoded = await encode(film, making);
-	return encoded ?? record(film, making);
+	const turns = timeline(film, making.loops);
+	const encoded = await encode(film, turns, making);
+	return encoded ?? record(film, turns, making);
 }
 
 const videoOf = (blob: Blob): Video => ({
@@ -29,7 +43,7 @@ const videoOf = (blob: Blob): Video => ({
 });
 
 /** Encodes in a worker, or resolves undefined where the browser can't. */
-function encode(film: Film, { progress, signal }: Making) {
+function encode(film: Film, turns: Turn[], { progress, signal, quality }: Making) {
 	if (typeof Worker !== 'function') return Promise.resolve(undefined);
 	return new Promise<Video | undefined>((resolve, reject) => {
 		const worker = new Worker(new URL('./video.worker.ts', import.meta.url), { type: 'module' });
@@ -54,12 +68,12 @@ function encode(film: Film, { progress, signal }: Making) {
 			else if (data.type === 'unsupported') resolve(undefined);
 			else reject(new Error(data.error));
 		};
-		// A copy, since a film from a page's state is a proxy, which can't be posted.
 		const job: VideoJob = {
-			frames: [...film.frames],
+			turns,
 			width: film.width,
 			height: film.height,
-			fps: film.fps
+			fps: film.fps,
+			quality
 		};
 		worker.postMessage(job);
 	});
@@ -74,7 +88,11 @@ function recordedType() {
 }
 
 /** Plays the film on the page's canvas once, recording it, in real time. */
-async function record(film: Film, { progress, canvas, signal }: Making): Promise<Video> {
+async function record(
+	film: Film,
+	turns: Turn[],
+	{ progress, canvas, signal, quality }: Making
+): Promise<Video> {
 	const type = recordedType();
 	if (!type || typeof canvas.captureStream !== 'function') throw new VideoUnsupported();
 	canvas.width = film.width;
@@ -85,10 +103,13 @@ async function record(film: Film, { progress, canvas, signal }: Making): Promise
 		context.drawImage(picture, 0, 0, film.width, film.height);
 		picture.close();
 	};
-	let next = decode(getImage, film.frames[0]);
+	let next = decode(getImage, turns[0].id);
 	draw(await next);
 	const stream = canvas.captureStream(film.fps);
-	const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 5_000_000 });
+	const recorder = new MediaRecorder(stream, {
+		mimeType: type,
+		videoBitsPerSecond: recordedBits[quality]
+	});
 	const chunks: Blob[] = [];
 	recorder.ondataavailable = ({ data }) => data.size && chunks.push(data);
 	const stopped = new Promise((resolve) => (recorder.onstop = resolve));
@@ -96,13 +117,15 @@ async function record(film: Film, { progress, canvas, signal }: Making): Promise
 	try {
 		const step = 1000 / film.fps;
 		const start = performance.now();
-		for (let index = 0; index < film.frames.length; index++) {
+		let shown = 0;
+		for (let index = 0; index < turns.length; index++) {
 			if (index > 0) draw(await next);
-			if (index + 1 < film.frames.length) next = decode(getImage, film.frames[index + 1]);
+			if (index + 1 < turns.length) next = decode(getImage, turns[index + 1].id);
 			progress(index + 1);
-			// Wait for the picture's turn to end, measured from the start so delays don't add up.
+			shown += turns[index].turns;
+			// Wait for the picture's turns to end, measured from the start so delays don't add up.
 			await new Promise((resolve) =>
-				setTimeout(resolve, Math.max(0, start + (index + 1) * step - performance.now()))
+				setTimeout(resolve, Math.max(0, start + shown * step - performance.now()))
 			);
 			signal.throwIfAborted();
 		}

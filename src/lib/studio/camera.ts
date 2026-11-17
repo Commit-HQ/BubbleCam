@@ -1,5 +1,7 @@
 // The device's camera, for the studio. Browser-only.
 
+import { longSide } from './geometry.ts';
+
 export type Facing = 'user' | 'environment';
 
 /** Why the camera can't be used: not allowed, not there, in use by another app, or not in this browser. */
@@ -12,18 +14,19 @@ export class CameraError extends Error {
 }
 
 /**
- * Opens the camera that faces the given way, or the only one there is. It asks for 720p, which is all a film
- * keeps (geometry.ts), so phones don't spend battery on a bigger picture.
+ * Opens the camera that faces the given way, or the only one there is. It asks for a picture `long` pixels
+ * long, 720p unless a grown-up chose otherwise, which is all a film keeps (geometry.ts), so phones don't spend
+ * battery on a bigger picture.
  */
-export async function openCamera(facing: Facing): Promise<MediaStream> {
+export async function openCamera(facing: Facing, long = longSide): Promise<MediaStream> {
 	if (!navigator.mediaDevices?.getUserMedia) throw new CameraError('unsupported');
 	try {
 		return await navigator.mediaDevices.getUserMedia({
 			audio: false,
 			video: {
 				facingMode: { ideal: facing },
-				width: { ideal: 1280 },
-				height: { ideal: 720 },
+				width: { ideal: long },
+				height: { ideal: (long * 9) / 16 },
 				frameRate: { ideal: 30 }
 			}
 		});

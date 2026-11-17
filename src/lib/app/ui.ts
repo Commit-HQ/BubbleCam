@@ -5,9 +5,9 @@
 export const roundButton =
 	'grid size-14 shrink-0 place-items-center rounded-full bg-white/12 text-white ring-1 ring-white/15 transition hover:bg-white/20 active:scale-90 disabled:pointer-events-none disabled:opacity-30 aria-pressed:bg-sky aria-pressed:text-night aria-pressed:ring-sky motion-reduce:active:scale-100';
 
-/** A smaller round button for the studio's top bar. */
+/** A smaller round button for the studio's top bar. `aria-pressed` lights it up, too. */
 export const smallButton =
-	'grid size-12 shrink-0 place-items-center rounded-full bg-white/12 text-white ring-1 ring-white/15 transition hover:bg-white/20 active:scale-90 disabled:pointer-events-none disabled:opacity-30 motion-reduce:active:scale-100';
+	'grid size-12 shrink-0 place-items-center rounded-full bg-white/12 text-white ring-1 ring-white/15 transition hover:bg-white/20 active:scale-90 disabled:pointer-events-none disabled:opacity-30 aria-pressed:bg-sky aria-pressed:text-night aria-pressed:ring-sky motion-reduce:active:scale-100';
 
 /** A pill with an icon and words, for the grown-ups' actions, such as making a video. */
 export const pillButton =

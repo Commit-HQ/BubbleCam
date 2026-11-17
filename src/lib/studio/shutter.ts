@@ -45,14 +45,16 @@ export class Shutter {
 
 	/**
 	 * Takes what the camera shows now: the part `crop` marks, at the film's `size`, mirrored for a camera that
-	 * faces the child, as the viewfinder shows it. It's drawn on `ghost` at once, and its files follow.
+	 * faces the child, as the viewfinder shows it. It's drawn on `ghost` at once, and its files follow, the
+	 * picture as a JPEG of the given `quality`.
 	 */
 	take(
 		video: HTMLVideoElement,
 		crop: Rect,
 		size: Size,
 		mirror: boolean,
-		ghost: HTMLCanvasElement
+		ghost: HTMLCanvasElement,
+		quality: number
 	): Promise<Picture> {
 		// A worker that can't start, as where scripts can't make workers, leaves encoding to the page.
 		if (this.#offscreen && !this.#worker) {
@@ -83,8 +85,8 @@ export class Shutter {
 		if (ghost.height !== size.height) ghost.height = size.height;
 		ghost.getContext('2d')!.drawImage(canvas, 0, 0);
 		const thumb = thumbSize(size);
-		if (canvas instanceof HTMLCanvasElement) return this.#encodeHere(canvas, thumb);
-		return this.#encodeInWorker(canvas.transferToImageBitmap(), thumb);
+		if (canvas instanceof HTMLCanvasElement) return this.#encodeHere(canvas, thumb, quality);
+		return this.#encodeInWorker(canvas.transferToImageBitmap(), thumb, quality);
 	}
 
 	/** Lets the worker go, with any picture it was still encoding. */
@@ -106,12 +108,12 @@ export class Shutter {
 		return this.#canvas;
 	}
 
-	#encodeInWorker(picture: ImageBitmap, thumb: Size) {
+	#encodeInWorker(picture: ImageBitmap, thumb: Size, quality: number) {
 		const worker = this.#worker!;
 		const id = this.#nextJob++;
 		return new Promise<Picture>((resolve, reject) => {
 			this.#jobs.set(id, { resolve, reject });
-			worker.postMessage({ id, picture, thumb }, [picture]);
+			worker.postMessage({ id, picture, thumb, quality }, [picture]);
 		});
 	}
 
@@ -135,14 +137,14 @@ export class Shutter {
 	}
 
 	/** Encodes on the page. `toBlob` copies the canvas as it's called, so the next picture can reuse it. */
-	async #encodeHere(canvas: HTMLCanvasElement, thumb: Size): Promise<Picture> {
+	async #encodeHere(canvas: HTMLCanvasElement, thumb: Size, quality: number): Promise<Picture> {
 		const small = document.createElement('canvas');
 		small.width = thumb.width;
 		small.height = thumb.height;
 		const context = small.getContext('2d')!;
 		context.imageSmoothingQuality = 'high';
 		context.drawImage(canvas, 0, 0, thumb.width, thumb.height);
-		const [image, thumbnail] = await Promise.all([toBlob(canvas, 0.9), toBlob(small, 0.8)]);
+		const [image, thumbnail] = await Promise.all([toBlob(canvas, quality), toBlob(small, 0.8)]);
 		return { image, thumb: thumbnail };
 	}
 }

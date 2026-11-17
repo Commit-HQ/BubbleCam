@@ -1,9 +1,10 @@
 import type { Messages } from './en.ts';
 
-// Tekst sučelja na hrvatskom, istog oblika kao en.ts. Stranica se obraća roditeljima i odgojiteljicama s „vi”,
-// a aplikacija djeci s „ti”.
+// Tekst sučelja na hrvatskom, istog oblika kao en.ts. Stranica i postavke obraćaju se roditeljima i
+// odgojiteljicama s „vi”, a aplikacija djeci s „ti”.
 
 const plural = new Intl.PluralRules('hr');
+const seconds = new Intl.NumberFormat('hr', { maximumFractionDigits: 1 });
 
 /** „1 sličica”, „3 sličice”, „24 sličice”, „25 sličica”. */
 function pictures(count: number) {
@@ -85,8 +86,74 @@ export const hr: Messages = {
 			removeConfirm: 'Obriši',
 			keep: 'Ostavi ga',
 			unavailable:
-				'Ovaj preglednik ne može čuvati crtiće, možda zato što je u privatnom načinu rada. Otvori BubbleCam u običnom prozoru.'
+				'Ovaj preglednik ne može čuvati crtiće, možda zato što je u privatnom načinu rada. Otvori BubbleCam u običnom prozoru.',
+			settings: 'Postavke'
 		},
+		gate: {
+			title: 'Samo za odrasle',
+			question: (a: number, b: number) => `Koliko je ${a} puta ${b}?`,
+			wrong: 'Nije točno. Evo novog zadatka.',
+			cancel: 'Odustani',
+			settings: {
+				copy: 'Postavke su za roditelje i odgojitelje. Da ih otvorite, riješite zadatak.',
+				open: 'Otvori postavke'
+			},
+			remove: {
+				copy: 'Brisanje crtića je za roditelje i odgojitelje. Da nastavite, riješite zadatak.',
+				open: 'Nastavi'
+			},
+			video: {
+				copy: 'Izrada videa je za roditelje i odgojitelje. Da nastavite, riješite zadatak.',
+				open: 'Nastavi'
+			}
+		},
+		settings: {
+			title: 'Postavke',
+			language: 'Jezik',
+			shape: {
+				title: 'Oblik crtića',
+				hint: 'Vrijedi za nove crtiće. Započeti crtić zadržava svoj oblik.',
+				options: { auto: 'Kako se drži', landscape: 'Položen', portrait: 'Uspravan' }
+			},
+			lock: {
+				title: 'Zaključaj okretanje zaslona',
+				hint: 'Dok se crtić snima, zaslon ostaje okrenut kao crtić. U pregledniku se studio zato otvara preko cijelog zaslona.',
+				apple:
+					'Na iPhoneu i iPadu okretanje zaslona zaključajte u Kontrolnom centru. Web-stranica to ondje ne može.'
+			},
+			rest: {
+				title: 'Stanka nakon sličice',
+				hint: 'Koliko dugo crveni gumb miruje nakon sličice, da dva brza pritiska snime samo jednu.'
+			},
+			sounds: {
+				title: 'Zvukovi',
+				hint: 'Škljocaj pri snimanju i pucanj balončića pri brisanju sličice.'
+			},
+			guard: {
+				title: 'Zaštita brisanja',
+				hint: 'Prije brisanja crtića traži zadatak, kao i postavke.'
+			},
+			guardVideo: {
+				title: 'Zaštita izrade videa',
+				hint: 'Prije izrade videa traži zadatak, kao i postavke.'
+			},
+			pictures: {
+				title: 'Kvaliteta sličica',
+				hint: 'Veće sličice su oštrije i zauzimaju više mjesta na uređaju. Vrijedi za nove crtiće.',
+				options: { small: 'Manja', normal: 'Standardna', high: 'Visoka' }
+			},
+			video: {
+				title: 'Kvaliteta videa',
+				hint: 'Viša kvaliteta daje oštriji video, ali i veću datoteku.',
+				options: { small: 'Manja', normal: 'Standardna', high: 'Visoka' }
+			},
+			advanced: {
+				title: 'Napredni alati',
+				hint: 'U studio dodaje zum, jačinu duha, mrežu preko kamere, samookidač, premještanje sličica, zadržavanje sličice na zaslonu i video koji se ponavlja.'
+			},
+			done: 'Gotovo'
+		},
+		seconds: (value: number) => `${seconds.format(value)} s`,
 		install: {
 			button: 'Instaliraj',
 			iosTitle: 'Stavi BubbleCam na početni zaslon',
@@ -113,6 +180,18 @@ export const hr: Messages = {
 			hintNext: 'Sad je malo pomakni i opet škljocni.',
 			taken: (count: number) => `Snimljena je ${count}. sličica`,
 			removed: 'Sličica je obrisana',
+			tools: 'Zum, duh, mreža i samookidač',
+			zoom: 'Zum',
+			ghostStrength: 'Jačina duha',
+			grid: 'Mreža preko kamere',
+			timer: (seconds: number) => (seconds ? `Samookidač: ${seconds} s` : 'Samookidač: isključen'),
+			again: 'Odbrojavaj ponovno nakon svake sličice',
+			stopTimer: 'Zaustavi samookidač',
+			counting: (seconds: number) => `Sličica za ${seconds}`,
+			hold: 'Zadrži ovu sličicu na zaslonu',
+			moveEarlier: 'Pomakni ovu sličicu ranije',
+			moveLater: 'Pomakni ovu sličicu kasnije',
+			moved: (index: number) => `Sličica je sada ${index}. po redu`,
 			starting: 'Palim kameru…',
 			problems: {
 				denied: {
@@ -145,6 +224,8 @@ export const hr: Messages = {
 			failed: 'Video nije uspio',
 			failedCopy: 'Pokušaj ponovno. Ako opet ne uspije, ažuriraj preglednik.',
 			retry: 'Pokušaj ponovno',
+			loops: 'Koliko se puta crtić ponavlja',
+			times: (count: number) => (count === 1 ? 'Jedanput' : `${count} puta`),
 			shareTitle: 'Moj BubbleCam crtić',
 			fileName: 'bubblecam-crtic'
 		}

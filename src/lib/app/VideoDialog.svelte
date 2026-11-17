@@ -5,20 +5,49 @@
 	import type { Film } from '#lib/studio/films.ts';
 	import { decode } from '#lib/studio/decode.ts';
 	import { getImage } from '#lib/studio/films.ts';
+	import { loopChoices, type Quality } from '#lib/studio/settings.ts';
 	import { canShare, fileName, makeVideo, type Video } from '#lib/studio/video.ts';
 
 	// Making the film's video, then handing it on: shared to another app where the device can, such as the photo
 	// library or a messaging app, or saved as a file. Sharing needs a fresh tap, so it waits for one once the
-	// video is ready, rather than starting itself.
-	let { film, t, onclose }: { film: Film; t: Messages['app']['video']; onclose: () => void } =
-		$props();
+	// video is ready, rather than starting itself. With the advanced tools on, the finished video can be made
+	// again to play the cartoon several times over, which suits a short one.
+	let {
+		film,
+		quality,
+		loops: chosen = 1,
+		onloops,
+		t,
+		onclose
+	}: {
+		film: Film;
+		/** How finely the video is encoded, from the settings. */
+		quality: Quality;
+		/** How many times the video plays the cartoon, and what keeps another choice: the advanced tools' own. */
+		loops?: number;
+		onloops?: (loops: number) => void;
+		t: Messages['app']['video'];
+		onclose: () => void;
+	} = $props();
 
 	let dialog: HTMLDialogElement;
 	let canvas = $state<HTMLCanvasElement>();
 	let phase = $state<'making' | 'ready' | 'failed'>('making');
 	let done = $state(0);
 	let video = $state<{ url: string; file: File }>();
+	// svelte-ignore state_referenced_locally: the dialog starts from what was chosen last, then keeps its own.
+	let loops = $state(chosen);
 	const making = new AbortController();
+	const total = $derived(film.frames.length * loops);
+
+	function repeat(times: number) {
+		if (times === loops || phase === 'making') return;
+		loops = times;
+		onloops?.(times);
+		if (video) URL.revokeObjectURL(video.url);
+		video = undefined;
+		void make();
+	}
 
 	async function make() {
 		phase = 'making';
@@ -27,7 +56,9 @@
 			const made: Video = await makeVideo(film, {
 				progress: (count) => (done = count),
 				canvas: canvas!,
-				signal: making.signal
+				signal: making.signal,
+				quality,
+				loops
 			});
 			const name = fileName(t.fileName, film, made);
 			const file = new File([made.blob], name, { type: made.blob.type });
@@ -89,8 +120,8 @@
 	</div>
 
 	{#if phase === 'making'}
-		<progress class="mt-5" max={film.frames.length} value={done}></progress>
-		<p class="mt-2 text-center text-white/70">{t.progress(done, film.frames.length)}</p>
+		<progress class="mt-5" max={total} value={done}></progress>
+		<p class="mt-2 text-center text-white/70">{t.progress(done, total)}</p>
 		<div class="mt-5 flex justify-center">
 			<button
 				type="button"
@@ -113,6 +144,22 @@
 			>
 		</div>
 	{:else if video}
+		{#if onloops}
+			<div class="mt-5 flex items-center justify-center gap-3" role="group" aria-label={t.loops}>
+				<Icon name="repeat" class="size-6 text-white/70" />
+				<div class="flex gap-1 rounded-full bg-white/8 p-1">
+					{#each loopChoices as times (times)}
+						<button
+							type="button"
+							class="grid min-h-11 min-w-12 place-items-center rounded-full px-3 font-display text-lg font-semibold text-white transition hover:bg-white/15 aria-pressed:bg-sun aria-pressed:text-night"
+							aria-label={t.times(times)}
+							aria-pressed={loops === times}
+							onclick={() => repeat(times)}>{times}×</button
+						>
+					{/each}
+				</div>
+			</div>
+		{/if}
 		<div class="mt-6 flex flex-wrap justify-center gap-3">
 			{#if canShare(video.file)}
 				<button

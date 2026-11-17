@@ -2,11 +2,13 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import { formatDay, messages, type Locale } from '#lib/i18n/index.ts';
 	import { getThumbs, type Film } from '#lib/studio/films.ts';
+	import { timeline } from '#lib/studio/timeline.ts';
 	import { appPath } from '#lib/paths.ts';
 	import { onDestroy } from 'svelte';
 
-	// A cartoon on the cartoons' page: its first picture, how many it has, and when it was made. Pointed at with a
-	// mouse or reached with the keyboard, it plays its thumbnails at the film's speed, a little preview.
+	// A cartoon on the cartoons' page: its first picture, full size so it's sharp, how many it has, and when it was
+	// made. Pointed at with a mouse or reached with the keyboard, it plays its thumbnails at the film's speed, a
+	// little preview, in which a held picture stays as long as it does in the film.
 	let {
 		film,
 		cover,
@@ -24,12 +26,14 @@
 
 	async function play() {
 		wanted = true;
-		const frames = await (thumbs ??= getThumbs(film.frames).then((found) =>
-			film.frames.flatMap((id) => {
-				const blob = found.get(id);
-				return blob ? [URL.createObjectURL(blob)] : [];
-			})
-		));
+		const frames = await (thumbs ??= getThumbs(film.frames).then((found) => {
+			const addresses = new Map([...found].map(([id, blob]) => [id, URL.createObjectURL(blob)]));
+			// One address for each of the film's turns, so a held picture is simply shown again.
+			return timeline(film).flatMap((turn) => {
+				const address = addresses.get(turn.id);
+				return address ? Array.from({ length: turn.turns }, () => address) : [];
+			});
+		}));
 		if (!wanted || timer || frames.length < 2) return;
 		let index = 0;
 		timer = setInterval(() => {
@@ -47,7 +51,7 @@
 
 	onDestroy(() => {
 		stop();
-		void thumbs?.then((frames) => frames.forEach((frame) => URL.revokeObjectURL(frame)));
+		void thumbs?.then((frames) => new Set(frames).forEach((frame) => URL.revokeObjectURL(frame)));
 	});
 </script>
 

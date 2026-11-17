@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import FrameStrip from '#lib/app/FrameStrip.svelte';
+	import GateDialog from '#lib/app/GateDialog.svelte';
 	import ShutterButton from '#lib/app/ShutterButton.svelte';
 	import VideoDialog from '#lib/app/VideoDialog.svelte';
 	import Viewfinder from '#lib/app/Viewfinder.svelte';
@@ -10,6 +11,8 @@
 	import { messages } from '#lib/i18n/index.ts';
 	import { appPath } from '#lib/paths.ts';
 	import type { Film } from '#lib/studio/films.ts';
+	import { orientationOf } from '#lib/studio/geometry.ts';
+	import { heldAs, lockRotation, locksRotation } from '#lib/studio/rotation.ts';
 	import { Studio } from '#lib/studio/studio.svelte.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
@@ -18,23 +21,33 @@
 	// strip of pictures, and play. A tablet stands landscape, with the buttons down the side; a phone held upright
 	// has them under the picture, where thumbs reach. The cartoon in the address opens; without one, the first
 	// picture starts a new cartoon, which the address then names, so going back to it or reloading returns to it.
+	// What a grown-up chose in the settings shows here: the advanced tools add a button for the zoom and the
+	// ghost's strength to the top bar, and the screen is kept from turning where that was asked and can be done.
+	// With the self-timer on, a small button on the big one's shoulder makes it count down again after each
+	// picture, so the pictures take themselves until the big button is pressed.
 	let { data }: PageProps = $props();
 	const t = $derived(messages[data.locale].app);
 
 	const studio = new Studio();
 	/** The cartoon whose video is being made, while its dialog is open. */
 	let saving = $state.raw<Film>();
+	/** Whether the sum is being asked before a video, where a grown-up guards making one. */
+	let asking = $state(false);
+	/** Whether the sliders for the zoom and the ghost's strength are open over the camera. */
+	let tools = $state(false);
 	const said = $derived(
 		studio.event?.type === 'taken'
 			? t.studio.taken(studio.event.count)
-			: studio.event
-				? t.studio.removed
-				: ''
+			: studio.event?.type === 'moved'
+				? t.studio.moved(studio.event.count)
+				: studio.event
+					? t.studio.removed
+					: ''
 	);
 
 	/** The big button: a picture, or back to the camera from a picture or the film playing. */
 	function shutter() {
-		if (studio.mode === 'live') studio.capture();
+		if (studio.mode === 'live') studio.shoot();
 		else studio.live();
 	}
 
@@ -43,8 +56,15 @@
 		else studio.play();
 	}
 
-	async function save() {
+	function save() {
+		studio.stopTimer();
 		studio.live();
+		if (studio.settings.guardVideo) asking = true;
+		else void make();
+	}
+
+	async function make() {
+		asking = false;
 		saving = await studio.saved();
 	}
 
@@ -60,7 +80,8 @@
 	 * volume key: Space or Enter takes a picture, unless a button has the focus and takes the key itself.
 	 */
 	function keys(event: KeyboardEvent) {
-		if (event.defaultPrevented || event.repeat || saving || event.metaKey || event.ctrlKey) return;
+		if (event.defaultPrevented || event.repeat || event.metaKey || event.ctrlKey) return;
+		if (saving || asking) return;
 		const onControl = (event.target as Element).closest?.('button, a, input, select, textarea');
 		switch (event.key) {
 			case ' ':
@@ -89,7 +110,16 @@
 	onMount(() => {
 		studio.onstart = (id) =>
 			void goto(appPath(data.locale, { id }), { replace: true, shallow: true });
-		void studio.load(page.url.searchParams.get('id'));
+		studio.configure();
+		// The screen is kept as the cartoon lies or stands; a new one's shape is the one chosen for new cartoons,
+		// or else the way the device is held as the studio opens.
+		let turn: (() => void) | undefined;
+		let closed = false;
+		void studio.load(page.url.searchParams.get('id')).then(() => {
+			if (closed || !studio.settings.lock || !locksRotation()) return;
+			const chosen = studio.settings.shape === 'auto' ? heldAs() : studio.settings.shape;
+			turn = lockRotation(studio.film ? orientationOf(studio.film) : chosen);
+		});
 		void studio.startCamera();
 
 		// The screen stays on while shooting, which can take a while between pictures. The camera stops when the
@@ -115,6 +145,8 @@
 			document.removeEventListener('visibilitychange', visibility);
 			removeEventListener('keydown', keys);
 			void lock?.release().catch(() => {});
+			closed = true;
+			turn?.();
 			studio.close();
 		};
 	});
@@ -138,6 +170,17 @@
 			<Icon name="film" class="size-5 text-sun" />{studio.frames.length}
 		</p>
 		<div class="ml-auto flex items-center gap-2">
+			{#if studio.advanced}
+				<button
+					type="button"
+					class={smallButton}
+					aria-label={t.studio.tools}
+					aria-pressed={tools}
+					onclick={() => (tools = !tools)}
+				>
+					<Icon name="slidersHorizontal" class="size-6" />
+				</button>
+			{/if}
 			{#if studio.cameras > 1}
 				<button
 					type="button"
@@ -163,7 +206,7 @@
 	</header>
 
 	<div class="view min-h-0 min-w-0 p-3">
-		<Viewfinder {studio} t={t.studio} />
+		<Viewfinder {studio} t={t.studio} seconds={t.seconds} {tools} />
 	</div>
 
 	<div class="strip min-w-0 px-3 pb-1">
@@ -173,9 +216,13 @@
 			selected={studio.selected}
 			showing={studio.showing}
 			shape={studio.shape}
+			holds={studio.holds}
 			t={t.studio}
+			movable={studio.advanced}
 			onselect={(index) => studio.select(index)}
 			onremove={() => studio.remove()}
+			onmove={(from, to) => studio.move(from, to)}
+			onmoved={() => studio.moved()}
 		/>
 	</div>
 
@@ -191,12 +238,32 @@
 		>
 			<Icon name="ghost" class="size-7" />
 		</button>
-		<ShutterButton
-			label={studio.mode === 'live' ? t.studio.shutter : t.studio.camera}
-			live={studio.mode === 'live'}
-			disabled={studio.mode === 'live' && (studio.camera !== 'on' || !studio.loaded)}
-			onclick={shutter}
-		/>
+		<div class="relative grid">
+			<ShutterButton
+				label={studio.mode !== 'live'
+					? t.studio.camera
+					: studio.counting
+						? t.studio.stopTimer
+						: t.studio.shutter}
+				live={studio.mode === 'live'}
+				counting={studio.counting > 0}
+				shots={studio.shots}
+				rest={studio.rest}
+				disabled={studio.mode === 'live' && (studio.camera !== 'on' || !studio.loaded)}
+				onclick={shutter}
+			/>
+			{#if studio.timer > 0 && studio.mode === 'live'}
+				<button
+					type="button"
+					class="absolute -top-3 -right-4 grid size-11 place-items-center rounded-full bg-dusk text-white ring-1 ring-white/25 transition hover:bg-white/20 active:scale-90 aria-pressed:bg-sky aria-pressed:text-night aria-pressed:ring-sky motion-reduce:active:scale-100"
+					aria-label={t.studio.again}
+					aria-pressed={studio.again}
+					onclick={() => (studio.again = !studio.again)}
+				>
+					<Icon name="repeat" class="size-5" />
+				</button>
+			{/if}
+		</div>
 		<button
 			type="button"
 			class={roundButton}
@@ -211,8 +278,25 @@
 	<p class="sr-only" aria-live="polite">{said}</p>
 </div>
 
+{#if asking}
+	<GateDialog
+		t={t.gate}
+		copy={t.gate.video.copy}
+		open={t.gate.video.open}
+		onpass={make}
+		onclose={() => (asking = false)}
+	/>
+{/if}
+
 {#if saving}
-	<VideoDialog film={saving} t={t.video} onclose={() => (saving = undefined)} />
+	<VideoDialog
+		film={saving}
+		quality={studio.settings.video}
+		loops={studio.settings.loops}
+		onloops={studio.advanced ? (loops) => studio.setLoops(loops) : undefined}
+		t={t.video}
+		onclose={() => (saving = undefined)}
+	/>
 {/if}
 
 <style>

@@ -19,6 +19,8 @@ export type Film = {
 	fps: number;
 	/** Its pictures' IDs, in the order they play. */
 	frames: string[];
+	/** How long a picture is held on screen beyond its turn, in seconds, by its ID. Most films hold none. */
+	holds?: Record<string, number>;
 };
 
 const name = 'bubblecam';
@@ -135,7 +137,46 @@ export function deleteFrame(filmId: string, frameId: string) {
 	return changeFilm(filmId, (film, transaction) => {
 		transaction.objectStore('images').delete(frameId);
 		transaction.objectStore('thumbs').delete(frameId);
-		return { ...film, frames: film.frames.filter((id) => id !== frameId), updated: Date.now() };
+		return {
+			...film,
+			frames: film.frames.filter((id) => id !== frameId),
+			holds: without(film.holds, frameId),
+			updated: Date.now()
+		};
+	});
+}
+
+/** A film's holds without one picture's. */
+function without(holds: Film['holds'], frameId: string) {
+	if (!holds || !(frameId in holds)) return holds;
+	const { [frameId]: _, ...rest } = holds;
+	return rest;
+}
+
+/** Holds a picture on screen for `seconds` beyond its turn when the film plays, or lets it go with none. */
+export function holdFrame(filmId: string, frameId: string, seconds: number) {
+	return changeFilm(filmId, (film) => {
+		if (!film.frames.includes(frameId)) return undefined;
+		const holds =
+			seconds > 0 ? { ...film.holds, [frameId]: seconds } : without(film.holds, frameId);
+		return { ...film, holds, updated: Date.now() };
+	});
+}
+
+/**
+ * Puts a film's pictures in the given order. The order comes from the studio's strip, so it's followed only
+ * for pictures the film has, and a picture it doesn't name keeps its place after the rest.
+ */
+export function orderFrames(filmId: string, order: string[]) {
+	return changeFilm(filmId, (film) => {
+		const has = new Set(film.frames);
+		const named = new Set(order);
+		const frames = [
+			...order.filter((id) => has.has(id)),
+			...film.frames.filter((id) => !named.has(id))
+		];
+		if (frames.every((id, index) => id === film.frames[index])) return undefined;
+		return { ...film, frames, updated: Date.now() };
 	});
 }
 
@@ -166,17 +207,27 @@ export function getImage(frameId: string) {
 	return read<Blob | undefined>('images', (t) => t.objectStore('images').get(frameId));
 }
 
-/** The thumbnails of the given pictures, read in one transaction. Pictures without one are left out. */
-export async function getThumbs(frameIds: string[]) {
-	const transaction = (await database()).transaction('thumbs', 'readonly');
-	const store = transaction.objectStore('thumbs');
+/** The given pictures' files from one store, read in one transaction. Pictures without one are left out. */
+async function getFiles(store: 'images' | 'thumbs', frameIds: string[]) {
+	const transaction = (await database()).transaction(store, 'readonly');
+	const files = transaction.objectStore(store);
 	const requests = frameIds.map(
-		(id) => [id, store.get(id) as IDBRequest<Blob | undefined>] as const
+		(id) => [id, files.get(id) as IDBRequest<Blob | undefined>] as const
 	);
 	await done(transaction);
-	const thumbs = new Map<string, Blob>();
-	for (const [id, request] of requests) if (request.result) thumbs.set(id, request.result);
-	return thumbs;
+	const found = new Map<string, Blob>();
+	for (const [id, request] of requests) if (request.result) found.set(id, request.result);
+	return found;
+}
+
+/** The thumbnails of the given pictures, for the strip. */
+export function getThumbs(frameIds: string[]) {
+	return getFiles('thumbs', frameIds);
+}
+
+/** The given pictures, full size, such as each film's first for the cartoons' page, where a thumbnail is a blur. */
+export function getImages(frameIds: string[]) {
+	return getFiles('images', frameIds);
 }
 
 /**

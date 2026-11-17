@@ -1,7 +1,8 @@
 // Playing a film in the viewfinder, round and round, at its speed. Its pictures are full-size JPEG files, so a
 // few of them are decoded ahead of the one on screen and let go once shown; a short film is kept decoded whole,
 // so it loops without decoding anything again. If a slow device hasn't decoded the next picture in time, the
-// one on screen simply stays a little longer, as it would on a film projector. Browser-only.
+// one on screen simply stays a little longer, as it would on a film projector. A picture that's held stays for
+// its seconds beyond its turn. Browser-only.
 
 import { decode } from './decode.ts';
 
@@ -13,6 +14,7 @@ export class Player {
 	#load: (frameId: string) => Promise<Blob | undefined>;
 	#frames: string[] = [];
 	#fps = 8;
+	#holds: Record<string, number> = {};
 	/** Decoded pictures by their place in the film, or null for one that couldn't be read, which is skipped. */
 	#ready = new Map<number, ImageBitmap | null>();
 	#loading = new Set<number>();
@@ -29,13 +31,17 @@ export class Player {
 		this.#load = load;
 	}
 
-	/** Plays `frames` from the picture at `from`, at `fps` pictures a second, until stopped. */
-	play(frames: string[], fps: number, from = 0) {
+	/**
+	 * Plays `frames` at `fps` pictures a second, until stopped. `holds` says how many seconds longer a picture
+	 * stays, by its ID.
+	 */
+	play(frames: string[], fps: number, holds: Record<string, number> = {}) {
 		this.stop();
 		if (!frames.length) return;
 		this.#frames = frames;
 		this.#fps = fps;
-		this.#index = from % frames.length;
+		this.#holds = holds;
+		this.#index = 0;
 		this.#due = performance.now();
 		this.#prefetch();
 		this.#frame = requestAnimationFrame(this.#tick);
@@ -69,8 +75,9 @@ export class Player {
 			context.drawImage(picture, 0, 0);
 			this.onshow?.(shown);
 			const step = 1000 / this.#fps;
+			const stay = step + (this.#holds[this.#frames[shown]] ?? 0) * 1000;
 			// Keep time, unless a slow decode left playing more than a picture behind.
-			this.#due = now - this.#due > step ? now + step : this.#due + step;
+			this.#due = now - this.#due > step ? now + stay : this.#due + stay;
 		}
 		if (count > ahead) {
 			picture?.close();

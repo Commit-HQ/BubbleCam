@@ -1,10 +1,16 @@
 // The studio's little sounds, made on the spot with Web Audio rather than played from files: a camera's click
-// for each picture, and a soap bubble's pop when one is deleted. Phones on silent stay quiet in Safari, which
+// for each picture, a soap bubble's pop when one is deleted, and a tick for each second of the self-timer. Phones on silent stay quiet in Safari, which
 // otherwise plays Web Audio regardless, and the sounds mix with, rather than stop, music playing nearby.
 // Sounds are a nicety: anything that goes wrong is ignored. Browser-only.
 
 let context: AudioContext | undefined;
 let noise: AudioBuffer | undefined;
+let quiet = false;
+
+/** Turns the sounds off or on, as a grown-up set them. The buzz stays: it's felt, not heard. */
+export function mute(off: boolean) {
+	quiet = off;
+}
 
 /** The audio context, made on the first tap, as browsers require. */
 function audio() {
@@ -46,6 +52,7 @@ function burst(audio: AudioContext, at: number, pitch: number, length: number, v
 
 /** “Ka-chick”: the shutter opening, then closing. */
 export function click() {
+	if (quiet) return;
 	try {
 		const sound = audio();
 		burst(sound, 0, 2600, 0.035, 0.55);
@@ -57,6 +64,7 @@ export function click() {
 
 /** A bubble's pop: a quick fall in pitch. */
 export function pop() {
+	if (quiet) return;
 	try {
 		const sound = audio();
 		const start = sound.currentTime;
@@ -71,6 +79,27 @@ export function pop() {
 		tone.connect(gain).connect(sound.destination);
 		tone.start(start);
 		tone.stop(start + 0.14);
+	} catch {
+		// Silence is fine.
+	}
+}
+
+/** A soft tick for each second the self-timer counts down. */
+export function tick() {
+	if (quiet) return;
+	try {
+		const sound = audio();
+		const start = sound.currentTime;
+		const tone = sound.createOscillator();
+		tone.type = 'sine';
+		tone.frequency.setValueAtTime(1100, start);
+		const gain = sound.createGain();
+		gain.gain.setValueAtTime(0.0001, start);
+		gain.gain.exponentialRampToValueAtTime(0.2, start + 0.005);
+		gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.07);
+		tone.connect(gain).connect(sound.destination);
+		tone.start(start);
+		tone.stop(start + 0.09);
 	} catch {
 		// Silence is fine.
 	}

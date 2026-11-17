@@ -2,6 +2,7 @@
 // function, so each language builds its own sentence and plural.
 
 const plural = new Intl.PluralRules('en');
+const seconds = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
 /** "1 picture", "24 pictures". */
 function pictures(count: number) {
@@ -85,8 +86,76 @@ export const en = {
 			removeConfirm: 'Delete',
 			keep: 'Keep it',
 			unavailable:
-				'This browser can’t keep cartoons, perhaps because it’s in private mode. Open BubbleCam in a regular window.'
+				'This browser can’t keep cartoons, perhaps because it’s in private mode. Open BubbleCam in a regular window.',
+			settings: 'Settings'
 		},
+		/** The sum that keeps the settings, and deleting where that's guarded, for grown-ups. */
+		gate: {
+			title: 'Grown-ups only',
+			question: (a: number, b: number) => `What is ${a} times ${b}?`,
+			wrong: 'Not quite. Here’s another sum.',
+			cancel: 'Cancel',
+			settings: {
+				copy: 'The settings are for parents and teachers. To open them, answer the sum.',
+				open: 'Open settings'
+			},
+			remove: {
+				copy: 'Deleting a cartoon is for parents and teachers. To go on, answer the sum.',
+				open: 'Go on'
+			},
+			video: {
+				copy: 'Making a video is for parents and teachers. To go on, answer the sum.',
+				open: 'Go on'
+			}
+		},
+		settings: {
+			title: 'Settings',
+			language: 'Language',
+			shape: {
+				title: 'Cartoon shape',
+				hint: 'For new cartoons. A cartoon already started keeps its shape.',
+				options: { auto: 'As held', landscape: 'Wide', portrait: 'Tall' }
+			},
+			lock: {
+				title: 'Keep the screen from turning',
+				hint: 'While a cartoon is shot, the screen stays turned the way the cartoon is. In a browser, the studio opens full screen for this.',
+				apple:
+					'On iPhone and iPad, lock the screen’s rotation in Control Centre. A website can’t do it there.'
+			},
+			rest: {
+				title: 'Pause after a picture',
+				hint: 'How long the red button rests after a picture, so two quick presses take only one.'
+			},
+			sounds: {
+				title: 'Sounds',
+				hint: 'The shutter’s click, and the pop of a picture being deleted.'
+			},
+			guard: {
+				title: 'Guard deleting',
+				hint: 'Deleting a cartoon asks a sum first, as the settings do.'
+			},
+			guardVideo: {
+				title: 'Guard making videos',
+				hint: 'Making a video asks a sum first, as the settings do.'
+			},
+			pictures: {
+				title: 'Picture quality',
+				hint: 'Larger pictures are sharper and take more room on the device. For new cartoons.',
+				options: { small: 'Smaller', normal: 'Standard', high: 'High' }
+			},
+			video: {
+				title: 'Video quality',
+				hint: 'Higher quality makes a sharper video, and a bigger file.',
+				options: { small: 'Smaller', normal: 'Standard', high: 'High' }
+			},
+			advanced: {
+				title: 'Advanced tools',
+				hint: 'Adds to the studio: zoom, the ghost’s strength, a grid over the camera, a self-timer, moving pictures, holding a picture on screen, and a video that repeats.'
+			},
+			done: 'Done'
+		},
+		/** A length of time, such as "1.5 s". */
+		seconds: (value: number) => `${seconds.format(value)} s`,
 		install: {
 			button: 'Install',
 			iosTitle: 'Put BubbleCam on the Home Screen',
@@ -112,6 +181,19 @@ export const en = {
 			hintNext: 'Now move it a tiny bit and snap again.',
 			taken: (count: number) => `Picture ${count} taken`,
 			removed: 'Picture deleted',
+			/** The advanced tools, which a grown-up turns on in the settings. */
+			tools: 'Zoom, ghost, grid, and self-timer',
+			zoom: 'Zoom',
+			ghostStrength: 'Ghost’s strength',
+			grid: 'Grid over the camera',
+			timer: (seconds: number) => (seconds ? `Self-timer: ${seconds} s` : 'Self-timer: off'),
+			again: 'Count down again after each picture',
+			stopTimer: 'Stop the self-timer',
+			counting: (seconds: number) => `A picture in ${seconds}`,
+			hold: 'Hold this picture on screen',
+			moveEarlier: 'Move this picture earlier',
+			moveLater: 'Move this picture later',
+			moved: (index: number) => `The picture is now number ${index}`,
 			starting: 'Starting the camera…',
 			problems: {
 				denied: {
@@ -144,6 +226,9 @@ export const en = {
 			failed: 'The video didn’t work out',
 			failedCopy: 'Try again. If it still doesn’t work, update the browser.',
 			retry: 'Try again',
+			/** How many times the video plays the cartoon, with the advanced tools. */
+			loops: 'Times the cartoon plays',
+			times: (count: number) => (count === 1 ? 'Once' : `${count} times`),
 			shareTitle: 'My BubbleCam cartoon',
 			fileName: 'bubblecam-cartoon'
 		}

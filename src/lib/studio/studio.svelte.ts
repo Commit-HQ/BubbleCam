@@ -2,7 +2,8 @@
 // in the strip and the ghost the moment they're taken, and are written to the device a moment later, once
 // encoded. Every change to the device's films waits for the ones before it (`#write`), so they're saved in the
 // order they were made: a picture deleted just after it was taken is deleted after it's saved, and a film is
-// played or made into a video only once every picture in it can be read back. Browser-only.
+// played or made into a video only once every picture in it can be read back. What a grown-up set for the studio
+// (settings.ts) is read once, as it opens. Browser-only.
 
 import { decode } from './decode.ts';
 import {
@@ -21,14 +22,27 @@ import {
 	getFilm,
 	getImage,
 	getThumbs,
+	holdFrame,
 	keepFilms,
+	orderFrames,
 	setFps,
 	type Film
 } from './films.ts';
-import { coverCrop, filmSize, type Size } from './geometry.ts';
+import { coverCrop, filmSize, zoomCrop, type Size } from './geometry.ts';
 import { Player } from './player.ts';
+import {
+	defaults,
+	ghostRange,
+	holdRange,
+	inForce,
+	loadSettings,
+	pictureQuality,
+	saveSettings,
+	zoomRange,
+	type Settings
+} from './settings.ts';
 import { Shutter } from './shutter.ts';
-import { click, pop, tap } from './sound.ts';
+import { click, mute, pop, tap, tick } from './sound.ts';
 
 /** The three speeds a child picks from, in pictures a second. */
 export const speeds = { slow: 5, walk: 8, fast: 12 } as const;
@@ -51,7 +65,7 @@ export type Mode = 'live' | 'review' | 'play';
 export type CameraState = 'off' | 'starting' | 'on' | CameraProblem;
 
 /** What just happened, for screen readers. */
-export type Event = { type: 'taken' | 'removed'; count: number };
+export type Event = { type: 'taken' | 'removed' | 'moved'; count: number };
 
 /** Where the device remembers which camera the studio used last. */
 const facingKey = 'bubblecam:facing';
@@ -67,7 +81,22 @@ function rememberedFacing(): Facing {
 /** A thumbnail's address on the page, for a blob from the device. */
 const addressOf = (blob: Blob | undefined) => (blob ? URL.createObjectURL(blob) : undefined);
 
+const within = (range: { min: number; max: number }, value: number) =>
+	Math.min(range.max, Math.max(range.min, value));
+
 export class Studio {
+	/**
+	 * What a grown-up set, as it's followed: what belongs to the advanced tools only while they're on. The
+	 * defaults until `configure` reads the device's, in the browser, since the page is prerendered without them.
+	 */
+	settings = $state.raw<Settings>({ ...defaults });
+	/**
+	 * Whether the studio has its extra tools: zooming, the ghost's strength, the grid, the self-timer, moving
+	 * and holding pictures, and a video that repeats.
+	 */
+	advanced = $derived(this.settings.advanced);
+	/** How long the shutter rests after a picture, in milliseconds. */
+	rest = $derived(this.settings.rest * 1000);
 	/** The film being shot: undefined until a new film's first picture. Its `frames` aren't kept up to date. */
 	film = $state<Omit<Film, 'frames'>>();
 	frames = $state<Frame[]>([]);
@@ -77,6 +106,23 @@ export class Studio {
 	/** The picture on screen while the film plays. */
 	showing = $state(-1);
 	ghost = $state(true);
+	/** How strongly the ghost shows, as an opacity. */
+	ghostStrength = $state(defaults.ghost);
+	/** Whether lines divide the camera's picture in thirds. */
+	grid = $state(false);
+	/** The self-timer: how many seconds the big button counts down before a picture, or 0 without one. */
+	timer = $state(0);
+	/**
+	 * Whether the self-timer counts down again after each picture, so the pictures take themselves until the
+	 * big button stops them. Off whenever the studio opens, so a series never starts by surprise.
+	 */
+	again = $state(false);
+	/** The seconds left of a countdown under way, or 0. */
+	counting = $state(0);
+	/** How long each held picture stays on screen beyond its turn, in seconds, by its ID. */
+	holds = $state<Record<string, number>>({});
+	/** How far the camera's picture is zoomed in: 1 is the whole of it. */
+	zoom = $state(1);
 	speed = $state<Speed>('walk');
 	camera = $state<CameraState>('off');
 	facing = $state<Facing>(rememberedFacing());
@@ -91,7 +137,11 @@ export class Studio {
 	loaded = $state(false);
 
 	/** The shape of the viewfinder: the film's, or the camera's for a film not started yet. */
-	shape = $derived<Size | undefined>(this.film ?? (this.source && filmSize(this.source)));
+	shape = $derived<Size | undefined>(
+		this.film ??
+			(this.source &&
+				filmSize(this.source, this.settings.shape, pictureQuality[this.settings.pictures].long))
+	);
 
 	#video: HTMLVideoElement | undefined;
 	#ghost: HTMLCanvasElement | undefined;
@@ -104,15 +154,34 @@ export class Studio {
 	#removed = new Set<string>();
 	#closed = false;
 	#starts = 0;
+	/** When the big button has rested from its last press, by the page's clock. */
+	#rested = 0;
+	#countdown: ReturnType<typeof setTimeout> | undefined;
 	/** Called when a new film gets its ID, with its first picture. */
 	onstart: ((id: string) => void) | undefined;
+
+	/** Follows what a grown-up set on this device, from before the camera and the film are opened. */
+	configure() {
+		this.settings = inForce(loadSettings());
+		this.ghostStrength = this.settings.ghost;
+		this.grid = this.settings.grid;
+		this.timer = this.settings.timer;
+		mute(!this.settings.sounds);
+	}
+
+	/** Keeps one of the advanced tools' settings for the next time, beside what else the device keeps. */
+	#keep(change: Partial<Settings>) {
+		this.settings = { ...this.settings, ...change };
+		saveSettings({ ...loadSettings(), ...change });
+	}
 
 	/** Opens a film the device keeps, or starts a new one when there's none by that ID. */
 	async load(id: string | null) {
 		const film = id ? await getFilm(id).catch(() => undefined) : undefined;
 		if (film) {
-			const { frames, ...rest } = film;
+			const { frames, holds, ...rest } = film;
 			this.film = rest;
+			this.holds = holds ?? {};
 			this.speed = speedOf(film.fps);
 			const thumbs = await getThumbs(frames);
 			this.frames = frames.map((frame) => ({ id: frame, thumb: addressOf(thumbs.get(frame)) }));
@@ -142,7 +211,7 @@ export class Studio {
 		const start = ++this.#starts;
 		this.camera = 'starting';
 		try {
-			const stream = await openCamera(this.facing);
+			const stream = await openCamera(this.facing, this.#cameraLong());
 			if (this.#closed || start !== this.#starts) return closeCamera(stream);
 			this.#stream = stream;
 			this.mirrored = facesUser(stream);
@@ -162,8 +231,19 @@ export class Studio {
 		}
 	}
 
+	/**
+	 * How long a picture the camera is asked for, in pixels: as long as the film's pictures. A film whose shape
+	 * was chosen may lie while the camera's picture stands, or the other way round, and then keeps only the
+	 * middle of it, so the camera is asked for 1080p, which leaves that middle sharp.
+	 */
+	#cameraLong() {
+		const { long } = pictureQuality[this.settings.pictures];
+		return this.settings.shape === 'auto' ? long : Math.max(long, 1920);
+	}
+
 	/** Lets the camera go, as when the app goes into the background, which stops it anyway. */
 	stopCamera() {
+		this.stopTimer();
 		this.#starts++;
 		closeCamera(this.#stream);
 		this.#stream = undefined;
@@ -184,17 +264,71 @@ export class Studio {
 		await this.startCamera();
 	}
 
-	/** Takes a picture of what the camera shows, if it's on and in view. */
-	capture() {
+	/**
+	 * The big button, pressed while the camera shows: it takes a picture, or with the self-timer starts the
+	 * countdown to one, or stops a countdown under way. It then rests: presses that follow within its rest are
+	 * the same press, to a child, whose second one would otherwise stop the countdown the first one started.
+	 */
+	shoot() {
+		const now = performance.now();
+		if (now < this.#rested || !this.#ready()) return;
+		this.#rested = now + this.rest;
+		if (this.counting) this.stopTimer();
+		else if (this.timer) this.#count(this.timer);
+		else this.#take();
+	}
+
+	/** Whether a picture can be taken: the camera is on and in view, and a film being opened has opened. */
+	#ready() {
+		return (
+			this.loaded &&
+			this.camera === 'on' &&
+			this.mode === 'live' &&
+			Boolean(this.#video?.videoWidth)
+		);
+	}
+
+	/** Counts the seconds down to a picture, with a tick for each, and again after it where that's asked. */
+	#count(left: number) {
+		this.counting = left;
+		tick();
+		this.#countdown = setTimeout(() => {
+			if (left > 1) return this.#count(left - 1);
+			this.counting = 0;
+			if (this.#take() && this.again && this.timer) this.#count(this.timer);
+		}, 1000);
+	}
+
+	/** Stops a countdown, as when the big button is pressed again, or the camera gives way to something else. */
+	stopTimer() {
+		clearTimeout(this.#countdown);
+		this.counting = 0;
+	}
+
+	/** Sets the self-timer's seconds, or turns it off with 0, and keeps it for the next time. */
+	setTimer(seconds: number) {
+		this.stopTimer();
+		this.timer = seconds;
+		if (!seconds) this.again = false;
+		this.#keep({ timer: seconds });
+	}
+
+	/** Takes a picture of what the camera shows, if it's on and in view, and says whether it did. */
+	#take() {
 		const video = this.#video;
 		const ghost = this.#ghost;
-		// A film being opened isn't one to start anew.
-		if (!this.loaded || this.camera !== 'on' || this.mode !== 'live') return;
-		if (!video?.videoWidth || !ghost) return;
+		if (!this.#ready() || !video || !ghost) return false;
 		const source = { width: video.videoWidth, height: video.videoHeight };
 		const film = this.film ?? this.#start(source);
 		const size = { width: film.width, height: film.height };
-		const picture = this.#shutter.take(video, coverCrop(source, size), size, this.mirrored, ghost);
+		const picture = this.#shutter.take(
+			video,
+			zoomCrop(coverCrop(source, size), this.zoom),
+			size,
+			this.mirrored,
+			ghost,
+			pictureQuality[this.settings.pictures].jpeg
+		);
 		const id = crypto.randomUUID();
 		this.frames.push({ id, thumb: undefined });
 		this.shots++;
@@ -215,6 +349,7 @@ export class Studio {
 			if (frame) frame.thumb = addressOf(files.thumb);
 			await addFrame(film.id, id, files.image, files.thumb);
 		});
+		return true;
 	}
 
 	/** Starts a new film, shaped like the camera's picture, with its first picture. */
@@ -224,7 +359,7 @@ export class Studio {
 			id: crypto.randomUUID(),
 			created: now,
 			updated: now,
-			...filmSize(source),
+			...filmSize(source, this.settings.shape, pictureQuality[this.settings.pictures].long),
 			fps: speeds[this.speed],
 			frames: []
 		};
@@ -246,6 +381,7 @@ export class Studio {
 		const last = index === this.frames.length - 1;
 		this.#removed.add(frame.id);
 		this.frames.splice(index, 1);
+		delete this.holds[frame.id];
 		// After the strip's thumbnail has had its moment to leave.
 		if (frame.thumb) setTimeout(() => URL.revokeObjectURL(frame.thumb!), 1000);
 		this.event = { type: 'removed', count: this.frames.length };
@@ -259,9 +395,85 @@ export class Studio {
 		}
 	}
 
+	/**
+	 * Moves a picture to another place in the film, on the page. `moved` then keeps the new order on the device,
+	 * once the picture has been put down.
+	 */
+	move(from: number, to: number) {
+		if (this.mode === 'play' || from === to || !this.frames[from] || !this.frames[to]) return;
+		const looked = this.frames[this.selected]?.id;
+		const [frame] = this.frames.splice(from, 1);
+		this.frames.splice(to, 0, frame);
+		// The picture being looked at stays the one being looked at.
+		if (looked) this.selected = this.frames.findIndex((other) => other.id === looked);
+	}
+
+	/** Keeps the pictures' order after `move`, and shows the last one as the ghost, which may be another now. */
+	moved() {
+		const film = this.film;
+		if (!film) return;
+		const order = this.frames.map((frame) => frame.id);
+		this.#write(() => orderFrames(film.id, order));
+		this.#write(() => this.#drawGhost());
+	}
+
+	/** Moves the picture being looked at one place earlier or later: what dragging does, for one press. */
+	shift(by: -1 | 1) {
+		const to = this.selected + by;
+		if (this.mode !== 'review' || !this.frames[to]) return;
+		this.move(this.selected, to);
+		this.moved();
+		this.event = { type: 'moved', count: to + 1 };
+		tap();
+	}
+
+	/** Zooms the camera's picture in, for the pictures taken from now on. */
+	setZoom(zoom: number) {
+		this.zoom = within(zoomRange, zoom);
+	}
+
+	/** Sets how strongly the ghost shows, and keeps it for the next time. */
+	setGhostStrength(strength: number) {
+		this.ghostStrength = within(ghostRange, strength);
+		this.#keep({ ghost: this.ghostStrength });
+	}
+
+	/** Shows or hides the grid over the camera, and keeps it for the next time. */
+	setGrid(grid: boolean) {
+		this.grid = grid;
+		this.#keep({ grid });
+	}
+
+	/** Sets how many times a video plays the film, and keeps it for the next time. */
+	setLoops(loops: number) {
+		this.#keep({ loops });
+	}
+
+	/**
+	 * Holds the picture being looked at on screen for `seconds` beyond its turn, on the page. `held` then keeps
+	 * it on the device, once the slider has been let go.
+	 */
+	hold(seconds: number) {
+		const frame = this.frames[this.selected];
+		if (this.mode !== 'review' || !frame) return;
+		const held = within(holdRange, seconds);
+		if (held > 0) this.holds[frame.id] = held;
+		else delete this.holds[frame.id];
+	}
+
+	/** Keeps how long the picture being looked at is held, after `hold`. */
+	held() {
+		const film = this.film;
+		const frame = this.frames[this.selected];
+		if (!film || !frame) return;
+		const seconds = this.holds[frame.id] ?? 0;
+		this.#write(() => holdFrame(film.id, frame.id, seconds));
+	}
+
 	/** Shows one picture taken earlier, big, in place of the camera. */
 	select(index: number) {
 		if (!this.frames[index]) return;
+		this.stopTimer();
 		this.#player?.stop();
 		this.mode = 'review';
 		this.selected = index;
@@ -289,12 +501,14 @@ export class Studio {
 	/** Plays the film, round and round, once every picture in it can be read. */
 	play() {
 		if (this.frames.length < 2) return;
+		this.stopTimer();
 		this.#player?.stop();
 		this.mode = 'play';
 		this.selected = -1;
 		const ids = this.frames.map((frame) => frame.id);
+		const holds = $state.snapshot(this.holds);
 		this.#write(async () => {
-			if (this.mode === 'play') this.#player?.play(ids, speeds[this.speed]);
+			if (this.mode === 'play') this.#player?.play(ids, speeds[this.speed], holds);
 		});
 	}
 
@@ -311,7 +525,13 @@ export class Studio {
 	async saved(): Promise<Film | undefined> {
 		await this.#writes;
 		const film = this.film;
-		return film && { ...$state.snapshot(film), frames: this.frames.map((frame) => frame.id) };
+		return (
+			film && {
+				...$state.snapshot(film),
+				frames: this.frames.map((frame) => frame.id),
+				holds: $state.snapshot(this.holds)
+			}
+		);
 	}
 
 	/** Closes the studio. Pictures still being encoded or saved finish first. */

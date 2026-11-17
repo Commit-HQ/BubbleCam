@@ -2,7 +2,13 @@
 // and the buttons never wait for it (shutter.ts). Pictures arrive as bitmaps the page hands over, and are
 // encoded in the order they arrive.
 
-type Job = { id: number; picture: ImageBitmap; thumb: { width: number; height: number } };
+type Job = {
+	id: number;
+	picture: ImageBitmap;
+	thumb: { width: number; height: number };
+	/** The picture's JPEG quality, from 0 to 1. */
+	quality: number;
+};
 
 let full: OffscreenCanvas | undefined;
 let small: OffscreenCanvas | undefined;
@@ -13,7 +19,7 @@ function canvas(current: OffscreenCanvas | undefined, width: number, height: num
 }
 
 self.onmessage = async ({ data }: MessageEvent<Job>) => {
-	const { id, picture, thumb } = data;
+	const { id, picture, thumb, quality } = data;
 	try {
 		full = canvas(full, picture.width, picture.height);
 		full.getContext('2d')!.drawImage(picture, 0, 0);
@@ -24,7 +30,7 @@ self.onmessage = async ({ data }: MessageEvent<Job>) => {
 		picture.close();
 		// Each canvas is copied as the call is made, so the next picture may draw on it straight away.
 		const [image, thumbnail] = await Promise.all([
-			full.convertToBlob({ type: 'image/jpeg', quality: 0.9 }),
+			full.convertToBlob({ type: 'image/jpeg', quality }),
 			small.convertToBlob({ type: 'image/jpeg', quality: 0.8 })
 		]);
 		self.postMessage({ id, image, thumb: thumbnail });

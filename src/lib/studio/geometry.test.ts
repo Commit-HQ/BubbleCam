@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coverCrop, filmSize, fit, thumbSize } from './geometry.ts';
+import { coverCrop, filmSize, fit, orientationOf, thumbSize, zoomCrop } from './geometry.ts';
 
 describe('filmSize', () => {
 	it('keeps 720p pictures as they are', () => {
@@ -18,6 +18,44 @@ describe('filmSize', () => {
 		expect(height % 16).toBe(0);
 		expect(width / height).toBeCloseTo(1000 / 562, 1);
 	});
+
+	it('lies or stands as chosen, whichever way the camera is held', () => {
+		// A phone held upright, for a film that lies: the middle of the camera's picture, 720 by 405.
+		expect(filmSize({ width: 720, height: 1280 }, 'landscape')).toEqual({
+			width: 720,
+			height: 400
+		});
+		expect(filmSize({ width: 1280, height: 720 }, 'portrait')).toEqual({ width: 400, height: 720 });
+		expect(filmSize({ width: 1280, height: 720 }, 'landscape')).toEqual({
+			width: 1280,
+			height: 720
+		});
+		expect(filmSize({ width: 720, height: 1280 }, 'portrait')).toEqual({
+			width: 720,
+			height: 1280
+		});
+	});
+
+	it('is as long as the pictures’ quality asks, and never longer than the camera’s picture', () => {
+		expect(filmSize({ width: 1920, height: 1080 }, 'auto', 1920)).toEqual({
+			width: 1920,
+			height: 1088
+		});
+		expect(filmSize({ width: 1920, height: 1080 }, 'auto', 960)).toEqual({
+			width: 960,
+			height: 544
+		});
+		expect(filmSize({ width: 1280, height: 720 }, 'auto', 1920)).toEqual({
+			width: 1280,
+			height: 720
+		});
+	});
+});
+
+it('tells a lying picture from a standing one', () => {
+	expect(orientationOf({ width: 1280, height: 720 })).toBe('landscape');
+	expect(orientationOf({ width: 720, height: 1280 })).toBe('portrait');
+	expect(orientationOf({ width: 480, height: 480 })).toBe('landscape');
 });
 
 describe('coverCrop', () => {
@@ -46,6 +84,12 @@ describe('coverCrop', () => {
 			height: 720
 		});
 	});
+});
+
+it('zooms into the middle of what a picture keeps', () => {
+	const whole = { x: 100, y: 0, width: 1200, height: 900 };
+	expect(zoomCrop(whole, 1)).toEqual(whole);
+	expect(zoomCrop(whole, 2)).toEqual({ x: 400, y: 225, width: 600, height: 450 });
 });
 
 it('fits a shape in a space', () => {

@@ -1,30 +1,36 @@
 <script lang="ts">
 	import ConfirmDialog from '#lib/app/ConfirmDialog.svelte';
 	import FilmCard from '#lib/app/FilmCard.svelte';
+	import SettingsDialog from '#lib/app/SettingsDialog.svelte';
 	import { addsFromShareMenu, install, installApp } from '#lib/app/install.svelte.ts';
 	import BuildLabel from '#lib/components/BuildLabel.svelte';
 	import Bubble from '#lib/components/Bubble.svelte';
 	import Icon from '#lib/components/Icon.svelte';
-	import LanguageSwitch from '#lib/components/LanguageSwitch.svelte';
 	import SiteHeader from '#lib/components/SiteHeader.svelte';
 	import { messages } from '#lib/i18n/index.ts';
 	import { appPath, privacyPath } from '#lib/paths.ts';
 	import { aboutUrl } from '#lib/project.ts';
-	import { deleteFilm, getThumbs, listFilms, type Film } from '#lib/studio/films.ts';
+	import { deleteFilm, getImages, listFilms, type Film } from '#lib/studio/films.ts';
+	import { loadSettings } from '#lib/studio/settings.ts';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 
 	// The cartoons this device keeps, newest first, after a card that starts a new one. They're read from the
 	// device in the browser, so the prerendered page has the heading, a line on what to do, and the new cartoon's
-	// card, and nothing bigger appears later than those first words, which keeps the page quick to show.
+	// card, and nothing bigger appears later than those first words, which keeps the page quick to show. A
+	// cartoon's cover is its first picture, full size: a card is several times larger than a thumbnail of the
+	// strip, most of all for a cartoon that stands.
 	let { data }: PageProps = $props();
 	const t = $derived(messages[data.locale]);
 
 	type Card = { film: Film; cover: string | undefined };
 	let cards = $state<Card[]>();
 	let unavailable = $state(false);
+	/** The cartoon about to be deleted, and whether a grown-up guards deleting, so its question asks the sum. */
 	let removing = $state<Card>();
+	let guarded = $state(false);
 	let tip = $state(false);
+	let settings = $state(false);
 
 	/** Where the device remembers that the Home Screen tip was put away. */
 	const tipKey = 'bubblecam:home-screen-tip';
@@ -34,10 +40,10 @@
 		void (async () => {
 			try {
 				const films = await listFilms();
-				const thumbs = await getThumbs(films.map((film) => film.frames[0]));
+				const firsts = await getImages(films.map((film) => film.frames[0]));
 				cards = films.map((film) => {
-					const thumb = thumbs.get(film.frames[0]);
-					return { film, cover: thumb && URL.createObjectURL(thumb) };
+					const first = firsts.get(film.frames[0]);
+					return { film, cover: first && URL.createObjectURL(first) };
 				});
 				covers = cards.flatMap((card) => (card.cover ? [card.cover] : []));
 			} catch (error) {
@@ -88,7 +94,15 @@
 					><Icon name="download" /><span class="max-sm:hidden">{t.app.install.button}</span></button
 				>
 			{/if}
-			<LanguageSwitch locale={data.locale} />
+			<!-- For grown-ups: the settings, the language among them, ask a sum before they open. -->
+			<button
+				type="button"
+				class="grid size-11 place-items-center rounded-full bg-ink/5 text-ink transition-colors hover:bg-ink/10"
+				aria-label={t.app.films.settings}
+				onclick={() => (settings = true)}
+			>
+				<Icon name="settings" class="size-6" />
+			</button>
 		</div>
 	</SiteHeader>
 
@@ -144,7 +158,10 @@
 					film={card.film}
 					cover={card.cover}
 					locale={data.locale}
-					onremove={() => (removing = card)}
+					onremove={() => {
+						guarded = loadSettings().guard;
+						removing = card;
+					}}
 				/>
 			{/each}
 		</ul>
@@ -173,6 +190,7 @@
 		copy={t.app.films.removeCopy}
 		confirm={t.app.films.removeConfirm}
 		cancel={t.app.films.keep}
+		gate={guarded ? t.app.gate : undefined}
 		onconfirm={() => remove(card)}
 		onclose={() => (removing = undefined)}
 	>
@@ -180,6 +198,10 @@
 			<img src={card.cover} alt="" class="mb-5 aspect-4/3 w-full rounded-3xl object-cover" />
 		{/if}
 	</ConfirmDialog>
+{/if}
+
+{#if settings}
+	<SettingsDialog locale={data.locale} onclose={() => (settings = false)} />
 {/if}
 
 <style>

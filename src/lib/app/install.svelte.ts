@@ -4,6 +4,7 @@
 // Browser-only.
 
 import { browser } from '$app/env';
+import { isAppleTouch } from '#lib/studio/rotation.ts';
 
 /** Chromium's install offer, which the DOM types don't describe. */
 type InstallPrompt = Event & { prompt(): Promise<void> };
@@ -28,11 +29,8 @@ export async function installApp() {
 
 /** Whether this is Safari, or another browser, on iPhone or iPad, outside an app on the Home Screen. */
 export function addsFromShareMenu() {
-	const apple =
-		/iPhone|iPad|iPod/.test(navigator.userAgent) ||
-		(/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 	const standalone =
 		(navigator as Navigator & { standalone?: boolean }).standalone === true ||
 		matchMedia('(display-mode: standalone)').matches;
-	return apple && !standalone;
+	return isAppleTouch() && !standalone;
 }

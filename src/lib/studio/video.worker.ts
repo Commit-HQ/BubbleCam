@@ -10,23 +10,37 @@ import {
 	Mp4OutputFormat,
 	Output,
 	QUALITY_HIGH,
+	QUALITY_MEDIUM,
+	QUALITY_VERY_HIGH,
 	WebMOutputFormat
 } from 'mediabunny';
 import { getImage } from './films.ts';
 import { decode } from './decode.ts';
+import type { Quality } from './settings.ts';
+import type { Turn } from './timeline.ts';
 
-export type VideoJob = { frames: string[]; width: number; height: number; fps: number };
+export type VideoJob = {
+	/** The pictures in the order the video shows them, each for a number of the video's frames (timeline.ts). */
+	turns: Turn[];
+	width: number;
+	height: number;
+	fps: number;
+	quality: Quality;
+};
 export type VideoReply =
 	| { type: 'progress'; done: number }
 	| { type: 'done'; buffer: ArrayBuffer; mime: string }
 	| { type: 'unsupported' }
 	| { type: 'failed'; error: string };
 
+/** Mediabunny's quality for each choice: it sets the bitrate from the pictures' size and the codec. */
+const qualities = { small: QUALITY_MEDIUM, normal: QUALITY_HIGH, high: QUALITY_VERY_HIGH };
+
 const reply = (message: VideoReply, transfer: Transferable[] = []) =>
 	self.postMessage(message, { transfer });
 
 self.onmessage = async ({ data }: MessageEvent<VideoJob>) => {
-	const { frames, width, height, fps } = data;
+	const { turns, width, height, fps, quality } = data;
 	if (typeof VideoEncoder !== 'function' || typeof OffscreenCanvas !== 'function') {
 		return reply({ type: 'unsupported' });
 	}
@@ -46,19 +60,26 @@ self.onmessage = async ({ data }: MessageEvent<VideoJob>) => {
 			target: new BufferTarget()
 		});
 		// A key frame every two seconds, so a player can start anywhere without the file growing much.
-		const source = new CanvasSource(canvas, { codec, quality: QUALITY_HIGH, keyFrameInterval: 2 });
+		const source = new CanvasSource(canvas, {
+			codec,
+			quality: qualities[quality],
+			keyFrameInterval: 2
+		});
 		output.addVideoTrack(source, { frameRate: fps });
 		await output.start();
-		// The next picture decodes while this one encodes.
-		let next = decode(getImage, frames[0]);
-		for (let index = 0; index < frames.length; index++) {
+		// The next picture decodes while this one encodes. A picture that's held is encoded again for each of
+		// its turns, which costs next to nothing, since nothing in it changes.
+		let next = decode(getImage, turns[0].id);
+		let frame = 0;
+		for (let index = 0; index < turns.length; index++) {
 			const picture = await next;
-			if (index + 1 < frames.length) next = decode(getImage, frames[index + 1]);
+			if (index + 1 < turns.length) next = decode(getImage, turns[index + 1].id);
 			if (picture) {
 				context.drawImage(picture, 0, 0, width, height);
 				picture.close();
 			}
-			await source.add(index / fps, 1 / fps);
+			for (let turn = 0; turn < turns[index].turns; turn++)
+				await source.add(frame++ / fps, 1 / fps);
 			reply({ type: 'progress', done: index + 1 });
 		}
 		await output.finalize();
