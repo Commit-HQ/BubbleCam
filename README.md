@@ -27,6 +27,7 @@ BubbleCam is a sister of [BubbleBoard](https://github.com/Commit-HQ/BubbleBoard)
 - 🔴 **One big red button.** A picture is kept the moment it's taken, and the button rests a moment after it, so one press is one picture.
 - 🎞️ **A strip of pictures** to look back at, and a bin that takes the last one away.
 - ▶️ **Play, at three speeds:** a turtle, footsteps, and a rabbit, which kids read without words.
+- 🎤 **A voice for the toys:** record it while the cartoon plays, and it's in the video.
 - 🎬 **A video for the family:** one tap makes an MP4 to save or share.
 - 📴 **Works without the internet**, once it has been opened, and installs on phones, tablets, and computers.
 - 🔒 **Everything stays on the device**, in the browser's storage. There's no server that could see it.

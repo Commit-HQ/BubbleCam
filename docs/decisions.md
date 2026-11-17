@@ -44,11 +44,21 @@ Why BubbleCam behaves the way it does. Each entry is a decision the code alone d
 - **Mirrored as seen.** A camera facing the child shows a mirror image, as every camera app does, and the pictures are kept that way, so the cartoon moves the way it moved in the viewfinder. A computer's webcam, which often doesn't say which way it faces, counts as facing the child.
 - **New pictures go at the end.** Looking back at a picture is for checking it or deleting it, and, with the advanced tools, for moving it. Inserting one in the middle is deferred.
 
+## The voice
+
+- **A cartoon can have a voice: one recording, made while the cartoon plays through once.** A child gives the toys their voices and makes the noises, and what's said lines up with what's seen without any editing. A microphone beside the speeds starts it, after a countdown of three; the same button ends it sooner and keeps what was said, and anything else that stops the cartoon gives the take up. A new recording replaces the old one, and a bin beside the microphone takes the voice away.
+- **Everyone has it**, not only those with the advanced tools: it's one button, where the cartoon plays.
+- **The voice isn't tied to the pictures.** Pictures added or deleted afterwards, or another speed, leave the voice as it was: it plays from the start of the cartoon, is cut where the cartoon ends, and is followed by silence if it's shorter. Recording again is one press, and a cartoon whose voice vanished because a picture was deleted would be a worse surprise.
+- **The camera and the microphone are asked for together**, the first time the browser asks about the camera, so the first recording doesn't stop for a second question in the middle of a child's idea. The microphone is let go at once and is on only while a voice is recorded. Browsers ask one question for both, so someone who refuses is asked again for the camera alone where the browser allows a second question; a device without a microphone is asked for the camera alone.
+- **The camera stops while a voice is recorded**, and starts again on the way back to it. A phone doesn't always keep a camera and a microphone going when they're opened one after the other, and the cartoon is on screen then anyway.
+- **Turning the sounds off leaves the voice on.** The setting is for the shutter's click in a playroom; the voice is part of the cartoon.
+
 ## The video
 
 - **MP4 with H.264, made on the device.** It's the file every phone, messaging app, and computer plays. The browser's own encoder (WebCodecs) does the work in a worker, faster than the cartoon plays, and Mediabunny writes the file; where H.264 can't be encoded, the video is WebM. Browsers without WebCodecs record the cartoon as it plays with `MediaRecorder`, which takes as long as the cartoon, so older iPads still make videos.
 - **Not a GIF.** A GIF of a 720p cartoon is many times larger than its video, has 256 colours, and messaging apps often turn GIFs into videos anyway.
-- **Played once, at the cartoon's own frame rate**, unless a grown-up with the advanced tools asks for more rounds. No music or titles are added: the video is the cartoon.
+- **Played once, at the cartoon's own frame rate**, unless a grown-up with the advanced tools asks for more rounds, with the cartoon's voice if it has one, which starts over with each round. No music or titles are added: the video is the cartoon.
+- **The voice is AAC in the MP4**, which every phone plays, or Opus where the browser can't encode AAC. A browser that can encode neither records the cartoon as it plays instead, voice and all, which takes as long as the cartoon.
 - **Sharing waits for a tap.** Browsers allow the share sheet only right after a tap, so the video is made first and then offered with Share, where the device can share files, and Save, which downloads it.
 
 ## On the device, and only there
@@ -74,6 +84,6 @@ Why BubbleCam behaves the way it does. Each entry is a decision the code alone d
 - Inserting a picture in the middle, and copying one.
 - More than one ghost.
 - Keeping the screen from turning on iPhone and iPad, if Safari ever lets a website do it.
-- Sound: a voice-over or music in the video.
+- Music in the video, which needs tunes that may be shared and kept offline.
 - Titles, stickers, and drawing on pictures.
 - Moving a cartoon to another device.
