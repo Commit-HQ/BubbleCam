@@ -1,12 +1,19 @@
 // The cartoons a device keeps, in IndexedDB, which pages and workers share: each film's record, and each of its
 // pictures as two JPEG files, the picture itself and its thumbnail for the strip. Records and files are in
-// separate stores, so opening a film reads its small thumbnails and never every full picture. A film's voice,
-// one recording, is part of its record: the browser reads such a file only when it's played. Nothing here
-// leaves the device.
+// separate stores, so opening a film reads its small thumbnails and never every full picture. A film's sounds,
+// up to three recordings that play together (what's said, the noises around it, and music), are part of its
+// record: the browser reads such a file only when it's played. Nothing here leaves the device.
 //
 // Every change is one transaction: a picture's files arrive together with its place in the film, so a film
 // never names a picture it doesn't have. Transactions that change the same stores run in the order they're
 // made, and the studio makes its changes one after another (src/lib/studio/studio.svelte.ts).
+
+/**
+ * The sounds a film can have, each recorded by itself while the film played: what the toys say, the noises
+ * around them, and music. They play together, each as loud as it was set.
+ */
+export type Layer = 'voice' | 'ambience' | 'music';
+export const layers: readonly Layer[] = ['voice', 'ambience', 'music'];
 
 export type Film = {
 	id: string;
@@ -24,7 +31,23 @@ export type Film = {
 	holds?: Record<string, number>;
 	/** A voice recorded over the film as it played, in whatever sound file the browser records. */
 	voice?: Blob;
+	/** The noises around the toys, and music, recorded the same way, each by itself. */
+	ambience?: Blob;
+	music?: Blob;
+	/** How loud each sound plays, from 0 to 1, by its layer. One that isn't named plays as it was recorded. */
+	volumes?: Partial<Record<Layer, number>>;
 };
+
+/** A film's sounds, each with how loud it plays. */
+export function soundsOf(film: Pick<Film, Layer | 'volumes'>) {
+	return layers.flatMap((layer) => {
+		const sound = film[layer];
+		return sound ? [{ layer, sound, volume: film.volumes?.[layer] ?? 1 }] : [];
+	});
+}
+
+/** Whether a film has anything to hear. */
+export const hasSound = (film: Pick<Film, Layer>) => layers.some((layer) => film[layer]);
 
 const name = 'bubblecam';
 const version = 1;
@@ -183,13 +206,25 @@ export function orderFrames(filmId: string, order: string[]) {
 	});
 }
 
-/** Gives a film its voice, in place of any it had, or takes its voice away with none. */
-export function setVoice(filmId: string, voice: Blob | undefined) {
-	return changeFilm(filmId, ({ voice: _, ...film }) => ({
+/** Gives a film one of its sounds, in place of any it had there, or takes that sound away with none. */
+export function setSound(filmId: string, layer: Layer, sound: Blob | undefined) {
+	return changeFilm(filmId, ({ [layer]: _, ...film }) => ({
 		...film,
-		...(voice && { voice }),
+		...(sound && { [layer]: sound }),
 		updated: Date.now()
 	}));
+}
+
+/** Sets how loud one of a film's sounds plays, from 0 to 1. As loud as it was recorded is kept as nothing. */
+export function setVolume(filmId: string, layer: Layer, volume: number) {
+	return changeFilm(filmId, ({ volumes: { [layer]: _, ...others } = {}, ...film }) => {
+		const volumes = volume === 1 ? others : { ...others, [layer]: volume };
+		return {
+			...film,
+			...(Object.keys(volumes).length > 0 && { volumes }),
+			updated: Date.now()
+		};
+	});
 }
 
 /** Sets how many pictures a film shows in a second. */

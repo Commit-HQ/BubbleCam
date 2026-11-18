@@ -4,7 +4,14 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import type { Messages } from '#lib/i18n/index.ts';
 	import { fit } from '#lib/studio/geometry.ts';
-	import { ghostRange, holdRange, timerChoices, zoomRange } from '#lib/studio/settings.ts';
+	import { layers } from '#lib/studio/films.ts';
+	import {
+		ghostRange,
+		holdRange,
+		timerChoices,
+		volumeRange,
+		zoomRange
+	} from '#lib/studio/settings.ts';
 	import type { Studio } from '#lib/studio/studio.svelte.ts';
 	import { recordsVoice } from '#lib/studio/voice.ts';
 	import SpeedPicker from './SpeedPicker.svelte';
@@ -24,12 +31,16 @@
 	//
 	// While the film plays, a microphone beside the speeds records a voice over it: the film then plays through
 	// once, after a countdown, and the same button ends the recording sooner. A film with a voice has a bin
-	// beside the microphone, which takes the voice away.
+	// beside the microphone, which takes the voice away. With the advanced tools on, the film's three sounds
+	// stand beside the speeds instead, a voice, the noises around the toys, and music: a press on one records
+	// it at once, and one that has been recorded is yellow, with a tick. The button in the top bar opens the
+	// three over the film, each with a slider for how loud it plays and a bin.
 	let {
 		studio,
 		t,
 		seconds,
-		tools = false
+		tools = false,
+		mixer = false
 	}: {
 		studio: Studio;
 		t: Messages['app']['studio'];
@@ -37,7 +48,12 @@
 		seconds: Messages['app']['seconds'];
 		/** Whether the sliders for the zoom and the ghost's strength are open. */
 		tools?: boolean;
+		/** Whether the film's three sounds are open over it while it plays. */
+		mixer?: boolean;
 	} = $props();
+
+	/** The picture each of a film's sounds goes by. */
+	const layerIcons = { voice: 'mic', ambience: 'audioLines', music: 'music' } as const;
 
 	/** How long the picture being looked at is held, in seconds. */
 	const held = $derived(studio.holds[studio.frames[studio.selected]?.id] ?? 0);
@@ -68,6 +84,8 @@
 		'grid size-14 place-items-center rounded-full text-white transition hover:bg-white/15 active:scale-90 motion-reduce:active:scale-100';
 	const toolButton =
 		'grid h-12 min-w-12 place-items-center rounded-full px-2 text-white transition hover:bg-white/15 active:scale-90 aria-pressed:bg-sky aria-pressed:text-night motion-reduce:active:scale-100';
+	const layerButton =
+		'relative grid size-12 place-items-center rounded-full transition hover:bg-white/15 active:scale-90 motion-reduce:active:scale-100';
 	const moveButton =
 		'grid size-12 place-items-center rounded-full text-white transition hover:bg-white/15 active:scale-90 aria-disabled:opacity-30 motion-reduce:active:scale-100';
 
@@ -351,36 +369,123 @@
 					{t.voiceProblems[studio.voiceProblem]}
 				</p>
 			{/if}
-			<div class="absolute inset-x-3 bottom-3 flex flex-wrap items-center justify-center gap-2">
-				{#if !studio.recording && !studio.counting}
-					<SpeedPicker speed={studio.speed} {t} onchange={(speed) => studio.setSpeed(speed)} />
-				{/if}
-				{#if records}
-					<div
-						class="flex gap-1 rounded-full bg-night/70 p-1.5 ring-1 ring-white/15 backdrop-blur-md"
-					>
-						<button
-							type="button"
-							class="{voiceButton} aria-pressed:bg-coral"
-							aria-label={studio.recording ? t.finishRecording : t.record}
-							aria-pressed={studio.recording}
-							onclick={() => (studio.recording ? studio.finishRecording() : studio.record())}
-						>
-							<Icon name="mic" class="size-7" />
-						</button>
-						{#if studio.voice && !studio.recording && !studio.counting}
+			{#if mixer && records && !studio.taking && !studio.counting}
+				<!-- How loud the film's three sounds play together, and a bin for each. The button with the red dot
+				records, as the ones beside the speeds do; a sound that has been recorded shows in yellow, and only
+				then has a loudness to set and a bin. -->
+				<div
+					class="absolute inset-x-3 top-3 mx-auto grid max-w-sm rounded-3xl bg-night/70 px-2 py-1 ring-1 ring-white/15 backdrop-blur-md"
+					role="group"
+					aria-label={t.mixer}
+				>
+					{#each layers as layer (layer)}
+						{@const has = Boolean(studio.sounds[layer])}
+						<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2">
 							<button
 								type="button"
-								class={voiceButton}
-								aria-label={t.removeVoice}
-								onclick={() => studio.removeVoice()}
+								class="{layerButton} {has ? 'text-sun' : 'text-white'}"
+								aria-label={has ? t.sounds.again[layer] : t.sounds.record[layer]}
+								onclick={() => studio.record(layer)}
+							>
+								<Icon name={layerIcons[layer]} class="size-6" />
+								<span class="absolute top-1.5 right-1.5 size-2.5 rounded-full bg-coral"></span>
+							</button>
+							<label class="flex items-center {has ? '' : 'opacity-40'}">
+								<span class="sr-only">{t.sounds.volume[layer]}</span>
+								<input
+									type="range"
+									class="h-12 min-w-0 grow cursor-pointer accent-sun"
+									min={volumeRange.min}
+									max={volumeRange.max}
+									step={volumeRange.step}
+									value={studio.volumes[layer]}
+									disabled={!has}
+									oninput={(event) => studio.setVolume(layer, event.currentTarget.valueAsNumber)}
+									onchange={() => studio.keepVolume(layer)}
+								/>
+							</label>
+							<button
+								type="button"
+								class={moveButton}
+								aria-label={t.sounds.remove[layer]}
+								aria-disabled={!has}
+								onclick={() => studio.removeSound(layer)}
 							>
 								<Icon name="trash2" class="size-6" />
 							</button>
-						{/if}
-					</div>
-				{/if}
-			</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<div class="absolute inset-x-3 bottom-3 flex flex-wrap items-center justify-center gap-2">
+					{#if !studio.recording && !studio.counting}
+						<SpeedPicker
+							speed={studio.speed}
+							{t}
+							compact={studio.advanced && records}
+							onchange={(speed) => studio.setSpeed(speed)}
+						/>
+					{/if}
+					{#if records}
+						<div
+							class="flex gap-1 rounded-full bg-night/70 p-1.5 ring-1 ring-white/15 backdrop-blur-md"
+						>
+							{#if studio.taking}
+								<!-- The sound being recorded: the button shows which, and ends the recording. -->
+								<button
+									type="button"
+									class="{voiceButton} aria-pressed:bg-coral"
+									aria-label={studio.recording ? t.finishRecording : t.sounds.record[studio.taking]}
+									aria-pressed={studio.recording}
+									onclick={() => studio.finishRecording()}
+								>
+									<Icon name={layerIcons[studio.taking]} class="size-7" />
+								</button>
+							{:else if studio.advanced}
+								<!-- The three sounds: a press records one at once, in place of what it was. One that has
+								been recorded is yellow, with a tick. -->
+								{#each layers as layer (layer)}
+									{@const has = Boolean(studio.sounds[layer])}
+									<button
+										type="button"
+										class="{layerButton} {has ? 'text-sun' : 'text-white'}"
+										aria-label={has ? t.sounds.again[layer] : t.sounds.record[layer]}
+										onclick={() => studio.record(layer)}
+									>
+										<Icon name={layerIcons[layer]} class="size-7" />
+										{#if has}
+											<span
+												class="absolute top-0 right-0 grid size-4.5 place-items-center rounded-full bg-sun text-night"
+											>
+												<Icon name="check" class="size-3" />
+											</span>
+										{/if}
+									</button>
+								{/each}
+							{:else}
+								<button
+									type="button"
+									class={voiceButton}
+									aria-label={t.sounds.record.voice}
+									onclick={() => studio.record()}
+								>
+									<Icon name="mic" class="size-7" />
+								</button>
+								{#if studio.sounds.voice && !studio.counting}
+									<button
+										type="button"
+										class={voiceButton}
+										aria-label={t.sounds.remove.voice}
+										onclick={() => studio.removeSound('voice')}
+									>
+										<Icon name="trash2" class="size-6" />
+									</button>
+								{/if}
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 
 		{#if studio.counting}

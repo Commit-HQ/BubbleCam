@@ -94,15 +94,43 @@ describe('a film', () => {
 		const sound = (text: string) => new Blob([text], { type: 'audio/webm' });
 		await films.createFilm(film('a'));
 		await films.addFrame('a', 'one', jpeg('1'), jpeg('t1'));
-		await films.setVoice('a', sound('hello'));
+		await films.setSound('a', 'voice', sound('hello'));
 		expect(await (await films.getFilm('a'))?.voice?.text()).toBe('hello');
 		// Whatever else changes, the voice stays.
 		await films.setFps('a', 12);
 		await films.addFrame('a', 'two', jpeg('2'), jpeg('t2'));
-		await films.setVoice('a', sound('again'));
+		await films.setSound('a', 'voice', sound('again'));
 		expect(await (await films.getFilm('a'))?.voice?.text()).toBe('again');
-		await films.setVoice('a', undefined);
+		await films.setSound('a', 'voice', undefined);
 		expect(await films.getFilm('a')).not.toHaveProperty('voice');
+	});
+
+	it('keeps three sounds side by side, each with how loud it plays', async () => {
+		const sound = (text: string) => new Blob([text], { type: 'audio/webm' });
+		await films.createFilm(film('a'));
+		expect(films.hasSound((await films.getFilm('a'))!)).toBe(false);
+		await films.setSound('a', 'voice', sound('hello'));
+		await films.setSound('a', 'music', sound('la la'));
+		await films.setVolume('a', 'music', 0.4);
+		await films.setVolume('a', 'ambience', 0.5);
+		const kept = (await films.getFilm('a'))!;
+		expect(films.hasSound(kept)).toBe(true);
+		expect(kept.volumes).toEqual({ music: 0.4, ambience: 0.5 });
+		const heard = films.soundsOf(kept);
+		expect(heard.map(({ layer, volume }) => [layer, volume])).toEqual([
+			['voice', 1],
+			['music', 0.4]
+		]);
+		expect(await heard[1].sound.text()).toBe('la la');
+		// Taking one away leaves the others, and how loud it was for the next recording.
+		await films.setSound('a', 'music', undefined);
+		const left = (await films.getFilm('a'))!;
+		expect(films.soundsOf(left).map(({ layer }) => layer)).toEqual(['voice']);
+		expect(left.volumes).toEqual({ music: 0.4, ambience: 0.5 });
+		// As loud as it was recorded is the default, and isn't kept.
+		await films.setVolume('a', 'music', 1);
+		await films.setVolume('a', 'ambience', 1);
+		expect(await films.getFilm('a')).not.toHaveProperty('volumes');
 	});
 
 	it('remembers its speed', async () => {

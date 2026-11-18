@@ -24,6 +24,8 @@
 	// picture starts a new cartoon, which the address then names, so going back to it or reloading returns to it.
 	// What a grown-up chose in the settings shows here: the advanced tools add a button for the zoom and the
 	// ghost's strength to the top bar, and the screen is kept from turning where that was asked and can be done.
+	// That button opens the tools of whatever the picture shows: the camera's while the camera shows, and the
+	// cartoon's three sounds while it plays. From a picture being looked at, it goes back to the camera's.
 	// With the self-timer on, a small button on the big one's shoulder makes it count down again after each
 	// picture, so the pictures take themselves until the big button is pressed.
 	let { data }: PageProps = $props();
@@ -36,6 +38,8 @@
 	let asking = $state(false);
 	/** Whether the sliders for the zoom and the ghost's strength are open over the camera. */
 	let tools = $state(false);
+	/** Whether the cartoon's three sounds are open over it while it plays. */
+	let mixer = $state(false);
 	const said = $derived.by(() => {
 		const event = studio.event;
 		switch (event?.type) {
@@ -46,9 +50,9 @@
 			case 'moved':
 				return t.studio.moved(event.count);
 			case 'voiced':
-				return t.studio.voiced;
+				return t.studio.sounds.recorded[event.layer];
 			case 'unvoiced':
-				return t.studio.unvoiced;
+				return t.studio.sounds.removed[event.layer];
 			default:
 				return '';
 		}
@@ -60,6 +64,16 @@
 		else studio.live();
 	}
 
+	/** The top bar's button for the advanced tools: those of what the picture shows. */
+	function openTools() {
+		if (studio.mode === 'play') mixer = !mixer;
+		else if (studio.mode === 'live') tools = !tools;
+		else {
+			studio.live();
+			tools = true;
+		}
+	}
+
 	function playOrStop() {
 		if (studio.mode === 'play') studio.live();
 		else studio.play();
@@ -68,8 +82,8 @@
 	function save() {
 		studio.stopTimer();
 		studio.live();
-		// The tap is what lets a video that's recorded as the cartoon plays hear the cartoon's voice.
-		if (studio.voice) wake();
+		// The tap is what lets a video that's recorded as the cartoon plays hear the cartoon's sounds.
+		if (studio.sounded) wake();
 		if (studio.settings.guardVideo) asking = true;
 		else void make();
 	}
@@ -179,17 +193,21 @@
 			aria-hidden="true"
 		>
 			<Icon name="film" class="size-5 text-sun" />{studio.frames.length}
-			{#if studio.voice}<Icon name="mic" class="size-5 text-sun" />{/if}
+			{#if studio.sounded}
+				<span class="ml-1 inline-flex items-center gap-2">
+					<Icon name="mic" class="size-5 text-sun" />{studio.sounded}
+				</span>
+			{/if}
 		</p>
-		{#if studio.voice}<p class="sr-only">{t.studio.hasVoice}</p>{/if}
+		{#if studio.sounded}<p class="sr-only">{t.studio.hasSound(studio.sounded)}</p>{/if}
 		<div class="ml-auto flex items-center gap-2">
 			{#if studio.advanced}
 				<button
 					type="button"
 					class={smallButton}
-					aria-label={t.studio.tools}
-					aria-pressed={tools}
-					onclick={() => (tools = !tools)}
+					aria-label={studio.mode === 'play' ? t.studio.mixer : t.studio.tools}
+					aria-pressed={studio.mode === 'play' ? mixer : studio.mode === 'live' && tools}
+					onclick={openTools}
 				>
 					<Icon name="slidersHorizontal" class="size-6" />
 				</button>
@@ -219,7 +237,7 @@
 	</header>
 
 	<div class="view min-h-0 min-w-0 p-3">
-		<Viewfinder {studio} t={t.studio} seconds={t.seconds} {tools} />
+		<Viewfinder {studio} t={t.studio} seconds={t.seconds} {tools} {mixer} />
 	</div>
 
 	<div class="strip min-w-0 px-3 pb-1">

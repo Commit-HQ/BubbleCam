@@ -1,6 +1,7 @@
 // The studio's little sounds, made on the spot with Web Audio rather than played from files: a camera's click
 // for each picture, a soap bubble's pop when one is deleted, and a tick for each second of the self-timer. A
-// film's voice plays through the same output, so it needs no tap of its own to be heard. Phones on silent stay quiet in Safari, which
+// film's sounds play through the same output, each as loud as it was set, so they need no tap of their own to
+// be heard. Phones on silent stay quiet in Safari, which
 // otherwise plays Web Audio regardless, and the sounds mix with, rather than stop, music playing nearby.
 // Sounds are a nicety: anything that goes wrong is ignored. Browser-only.
 
@@ -68,30 +69,54 @@ export async function decodeVoice(voice: Blob): Promise<AudioBuffer | undefined>
 	}
 }
 
-let speaking: AudioBufferSourceNode | undefined;
+/** A film's sounds as they play, by name: where each comes from, and the knob for how loud it is. */
+const speaking = new Map<string, { source: AudioBufferSourceNode; gain: GainNode }>();
 
-/** Plays a film's voice from its start, in place of one that's playing. Turning the sounds off leaves it on. */
-export function speak(voice: AudioBuffer) {
+/**
+ * Plays a film's sounds together from their start, in place of any that are playing, each as loud as its
+ * `volume`, from 0 to 1. Turning the sounds off leaves them on.
+ */
+export function speak(sounds: { name: string; sound: AudioBuffer; volume: number }[]) {
 	hush();
 	try {
-		const sound = audio();
-		speaking = sound.createBufferSource();
-		speaking.buffer = voice;
-		speaking.connect(sound.destination);
-		speaking.start();
+		const output = audio();
+		// The same instant for all of them, so they stay in step with each other.
+		const start = output.currentTime;
+		for (const { name, sound, volume } of sounds) {
+			const source = output.createBufferSource();
+			source.buffer = sound;
+			const gain = output.createGain();
+			gain.gain.value = volume;
+			source.connect(gain).connect(output.destination);
+			source.start(start);
+			speaking.set(name, { source, gain });
+		}
 	} catch {
 		// Silence is fine.
 	}
 }
 
-/** Stops the voice. */
-export function hush() {
+/** Makes one of the sounds that are playing louder or quieter, without a click. */
+export function turn(name: string, volume: number) {
 	try {
-		speaking?.stop();
+		const playing = speaking.get(name);
+		if (playing && context) playing.gain.gain.setTargetAtTime(volume, context.currentTime, 0.02);
 	} catch {
-		// It had ended by itself.
+		// It's as loud as it was.
 	}
-	speaking = undefined;
+}
+
+/** Stops the sounds, or the one named. */
+export function hush(name?: string) {
+	for (const [playing, { source }] of speaking) {
+		if (name !== undefined && playing !== name) continue;
+		try {
+			source.stop();
+		} catch {
+			// It had ended by itself.
+		}
+		speaking.delete(playing);
+	}
 }
 
 /** A short burst of white noise, the stuff a shutter's click is made of. */

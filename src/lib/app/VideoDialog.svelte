@@ -4,7 +4,7 @@
 	import type { Messages } from '#lib/i18n/index.ts';
 	import type { Film } from '#lib/studio/films.ts';
 	import { decode } from '#lib/studio/decode.ts';
-	import { getImage } from '#lib/studio/films.ts';
+	import { getImage, hasSound } from '#lib/studio/films.ts';
 	import { loopChoices, type Quality } from '#lib/studio/settings.ts';
 	import { canShare, fileName, makeVideo, type Video } from '#lib/studio/video.ts';
 
@@ -112,7 +112,7 @@
 
 	<div class="overflow-hidden rounded-2xl bg-night">
 		{#if phase === 'ready' && video}
-			<!-- A cartoon with a voice is heard, and has the browser's controls, in case the browser won't start
+			<!-- A cartoon with a sound is heard, and has the browser's controls, in case the browser won't start
 			a video with sound by itself. -->
 			<!-- svelte-ignore a11y_media_has_caption: a child's own voice over toys isn't captioned. -->
 			<video
@@ -121,8 +121,8 @@
 				autoplay
 				loop
 				playsinline
-				muted={!film.voice}
-				controls={Boolean(film.voice)}
+				muted={!hasSound(film)}
+				controls={hasSound(film)}
 			></video>
 		{:else}
 			<canvas bind:this={canvas} class="block h-auto w-full" aria-hidden="true"></canvas>

@@ -11,6 +11,11 @@ function pictures(count: number) {
 	return `${count} ${plural.select(count) === 'few' ? 'sličice' : 'sličica'}`;
 }
 
+/** „s 1 zvukom”, „s 2 zvuka”, „s 3 zvuka”: crtić ih ima najviše tri. */
+function withSounds(count: number) {
+	return `s ${count} ${count === 1 ? 'zvukom' : 'zvuka'}`;
+}
+
 export const hr: Messages = {
 	languageName: 'Hrvatski',
 	ogLocale: 'hr_HR',
@@ -50,7 +55,7 @@ export const hr: Messages = {
 			},
 			{
 				title: 'Mikrofon',
-				copy: 'BubbleCam koristi mikrofon samo dok snimate glas za crtić i dok je u studiju uključeno slikanje na pljesak. Dok čeka pljesak, samo mjeri koliko je glasno: ništa se ne snima niti šalje. Preglednik dopuštenje za mikrofon traži zajedno s onim za kameru, da se snimanje poslije ne prekida. Snimljeni glas ostaje na uređaju, uz sličice.'
+				copy: 'BubbleCam koristi mikrofon samo dok snimate glas ili druge zvukove za crtić i dok je u studiju uključeno slikanje na pljesak. Dok čeka pljesak, samo mjeri koliko je glasno: ništa se ne snima niti šalje. Preglednik dopuštenje za mikrofon traži zajedno s onim za kameru, da se snimanje poslije ne prekida. Što snimite ostaje na uređaju, uz sličice.'
 			},
 			{
 				title: 'Bez računa, kolačića i praćenja',
@@ -82,8 +87,8 @@ export const hr: Messages = {
 			intro:
 				'Odaberi igračku, stavi je pred kameru i pritisni crveni gumb. Crtići ostaju na ovom uređaju, pa one najdraže spremi kao video.',
 			pictures,
-			open: (when: string, count: number, voiced: boolean) =>
-				`Crtić od ${when}, ${pictures(count)}${voiced ? ', s glasom' : ''}`,
+			open: (when: string, count: number, sounds: number) =>
+				`Crtić od ${when}, ${pictures(count)}${sounds ? `, ${withSounds(sounds)}` : ''}`,
 			remove: 'Obriši crtić',
 			removeTitle: 'Obrisati ovaj crtić?',
 			removeCopy:
@@ -132,7 +137,7 @@ export const hr: Messages = {
 			},
 			sounds: {
 				title: 'Zvukovi',
-				hint: 'Škljocaj pri snimanju i pucanj balončića pri brisanju sličice. Glas crtića čuje se i kad su isključeni.'
+				hint: 'Škljocaj pri snimanju i pucanj balončića pri brisanju sličice. Zvukovi crtića čuju se i kad su isključeni.'
 			},
 			guard: {
 				title: 'Zaštita brisanja',
@@ -154,7 +159,7 @@ export const hr: Messages = {
 			},
 			advanced: {
 				title: 'Napredni alati',
-				hint: 'U studio dodaje zum, jačinu duha, mrežu preko kamere, samookidač, slikanje bez dodira (kad se kadar umiri ili na pljesak), premještanje sličica, zadržavanje sličice na zaslonu i video koji se ponavlja.'
+				hint: 'U studio dodaje zum, jačinu duha, mrežu preko kamere, samookidač, slikanje bez dodira (kad se kadar umiri ili na pljesak), premještanje sličica, zadržavanje sličice na zaslonu, tri zvuka crtića (glas, pozadinski zvuk i glazba), svaki sa svojom glasnoćom, i video koji se ponavlja.'
 			},
 			clap: {
 				title: 'Osjetljivost na pljesak',
@@ -190,13 +195,42 @@ export const hr: Messages = {
 			hintNext: 'Sad je malo pomakni i opet škljocni.',
 			taken: (count: number) => `Snimljena je ${count}. sličica`,
 			removed: 'Sličica je obrisana',
-			record: 'Snimi glas',
+			sounds: {
+				record: {
+					voice: 'Snimi glas',
+					ambience: 'Snimi pozadinski zvuk',
+					music: 'Snimi glazbu'
+				},
+				again: {
+					voice: 'Snimi glas ponovno',
+					ambience: 'Snimi pozadinski zvuk ponovno',
+					music: 'Snimi glazbu ponovno'
+				},
+				remove: {
+					voice: 'Obriši glas',
+					ambience: 'Obriši pozadinski zvuk',
+					music: 'Obriši glazbu'
+				},
+				volume: {
+					voice: 'Glasnoća glasa',
+					ambience: 'Glasnoća pozadinskog zvuka',
+					music: 'Glasnoća glazbe'
+				},
+				recorded: {
+					voice: 'Glas je snimljen',
+					ambience: 'Pozadinski zvuk je snimljen',
+					music: 'Glazba je snimljena'
+				},
+				removed: {
+					voice: 'Glas je obrisan',
+					ambience: 'Pozadinski zvuk je obrisan',
+					music: 'Glazba je obrisana'
+				}
+			},
+			mixer: 'Glasnoća i brisanje zvukova crtića',
 			finishRecording: 'Završi snimanje',
-			removeVoice: 'Obriši glas',
 			recording: 'Snimam…',
-			voiced: 'Glas je snimljen',
-			unvoiced: 'Glas je obrisan',
-			hasVoice: 'S glasom',
+			hasSound: (count: number) => withSounds(count),
 			voiceProblems: {
 				denied:
 					'Mikrofon nije dopušten. Dopusti ga za ovu stranicu u postavkama preglednika, pa pokušaj ponovno.',

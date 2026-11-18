@@ -3,12 +3,19 @@
 	import type { Messages } from '#lib/i18n/index.ts';
 	import type { Speed } from '#lib/studio/studio.svelte.ts';
 
-	// How fast the film plays: a turtle, footsteps, or a rabbit, which children read without words.
+	// How fast the film plays: a turtle, footsteps, or a rabbit, which children read without words. The buttons
+	// are a little smaller where the film's three sounds stand beside them, so a phone shows both in one row.
 	let {
 		speed,
 		t,
+		compact = false,
 		onchange
-	}: { speed: Speed; t: Messages['app']['studio']; onchange: (speed: Speed) => void } = $props();
+	}: {
+		speed: Speed;
+		t: Messages['app']['studio'];
+		compact?: boolean;
+		onchange: (speed: Speed) => void;
+	} = $props();
 	const options: { speed: Speed; icon: IconName }[] = [
 		{ speed: 'slow', icon: 'turtle' },
 		{ speed: 'walk', icon: 'footprints' },
@@ -24,7 +31,9 @@
 	{#each options as option (option.speed)}
 		<button
 			type="button"
-			class="grid size-14 place-items-center rounded-full text-white transition hover:bg-white/15 aria-pressed:bg-sun aria-pressed:text-night"
+			class="grid {compact
+				? 'size-12'
+				: 'size-14'} place-items-center rounded-full text-white transition hover:bg-white/15 aria-pressed:bg-sun aria-pressed:text-night"
 			aria-label={t.speeds[option.speed]}
 			aria-pressed={speed === option.speed}
 			onclick={() => onchange(option.speed)}

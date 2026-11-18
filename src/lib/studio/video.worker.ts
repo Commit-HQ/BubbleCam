@@ -1,9 +1,9 @@
 // Makes a film's video in a worker, faster than it plays: each picture is read from IndexedDB, drawn, and encoded
 // with the browser's own video encoder (WebCodecs), and Mediabunny writes the encoded pictures into an MP4 file,
-// or a WebM file where the browser can't encode H.264. A film's voice arrives as samples the page decoded, and
-// is encoded beside the pictures, as AAC, or Opus where the browser can't encode that. A browser without
-// WebCodecs here, or one that can encode neither, says so, and the page records the film as it plays instead
-// (video.ts).
+// or a WebM file where the browser can't encode H.264. A film's sounds arrive mixed into one, as samples the
+// page decoded, and are encoded beside the pictures, as AAC, or Opus where the browser can't encode that. A
+// browser without WebCodecs here, or one that can encode neither, says so, and the page records the film as it
+// plays instead (video.ts).
 
 import {
 	AudioSample,
@@ -33,7 +33,7 @@ export type VideoJob = {
 	quality: Quality;
 	/** How many times the video plays the film, which `turns` already holds: the voice starts over each time. */
 	loops: number;
-	/** The film's voice as one row of samples, and how many of them make a second. */
+	/** The film's sounds, mixed into one row of samples (voice.ts), and how many of them make a second. */
 	voice?: { samples: Float32Array; rate: number };
 };
 export type VideoReply =

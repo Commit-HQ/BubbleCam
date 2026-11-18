@@ -9,6 +9,11 @@ function pictures(count: number) {
 	return `${count} ${plural.select(count) === 'one' ? 'picture' : 'pictures'}`;
 }
 
+/** "with 1 sound", "with 3 sounds". */
+function withSounds(count: number) {
+	return `with ${count} ${count === 1 ? 'sound' : 'sounds'}`;
+}
+
 export const en = {
 	languageName: 'English',
 	ogLocale: 'en_US',
@@ -49,7 +54,7 @@ export const en = {
 			},
 			{
 				title: 'The microphone',
-				copy: 'BubbleCam uses the microphone only while you record a voice for a cartoon, and while taking pictures on a clap is turned on in the studio. While it waits for a clap it only measures how loud the room is: nothing is recorded or sent. The browser asks to allow it together with the camera, so recording isn’t interrupted later. The recorded voice stays on the device, with the pictures.'
+				copy: 'BubbleCam uses the microphone only while you record a voice or other sounds for a cartoon, and while taking pictures on a clap is turned on in the studio. While it waits for a clap it only measures how loud the room is: nothing is recorded or sent. The browser asks to allow it together with the camera, so recording isn’t interrupted later. What you record stays on the device, with the pictures.'
 			},
 			{
 				title: 'No accounts, cookies, or tracking',
@@ -82,8 +87,8 @@ export const en = {
 				'Pick a toy, put it in front of the camera, and press the red button. Cartoons stay on this device, so save the ones you love as videos.',
 			pictures,
 			/** A cartoon's card, for screen readers: when it was made and how long it is. */
-			open: (when: string, count: number, voiced: boolean) =>
-				`Cartoon from ${when}, ${pictures(count)}${voiced ? ', with a voice' : ''}`,
+			open: (when: string, count: number, sounds: number) =>
+				`Cartoon from ${when}, ${pictures(count)}${sounds ? `, ${withSounds(sounds)}` : ''}`,
 			remove: 'Delete cartoon',
 			removeTitle: 'Delete this cartoon?',
 			removeCopy:
@@ -133,7 +138,7 @@ export const en = {
 			},
 			sounds: {
 				title: 'Sounds',
-				hint: 'The shutter’s click, and the pop of a picture being deleted. A cartoon’s voice plays either way.'
+				hint: 'The shutter’s click, and the pop of a picture being deleted. A cartoon’s own sounds play either way.'
 			},
 			guard: {
 				title: 'Guard deleting',
@@ -155,7 +160,7 @@ export const en = {
 			},
 			advanced: {
 				title: 'Advanced tools',
-				hint: 'Adds to the studio: zoom, the ghost’s strength, a grid over the camera, a self-timer, hands-free pictures (when the picture settles, or on a clap), moving pictures, holding a picture on screen, and a video that repeats.'
+				hint: 'Adds to the studio: zoom, the ghost’s strength, a grid over the camera, a self-timer, hands-free pictures (when the picture settles, or on a clap), moving pictures, holding a picture on screen, three sounds for a cartoon (a voice, background sounds, and music), each as loud as you set it, and a video that repeats.'
 			},
 			clap: {
 				title: 'Clap sensitivity',
@@ -191,14 +196,43 @@ export const en = {
 			hintNext: 'Now move it a tiny bit and snap again.',
 			taken: (count: number) => `Picture ${count} taken`,
 			removed: 'Picture deleted',
-			/** A voice recorded over the cartoon as it plays through once. */
-			record: 'Record a voice',
+			/** The cartoon's three sounds, each recorded over it as it plays through once. */
+			sounds: {
+				record: {
+					voice: 'Record a voice',
+					ambience: 'Record background sounds',
+					music: 'Record music'
+				},
+				again: {
+					voice: 'Record the voice again',
+					ambience: 'Record the background sounds again',
+					music: 'Record the music again'
+				},
+				remove: {
+					voice: 'Delete the voice',
+					ambience: 'Delete the background sounds',
+					music: 'Delete the music'
+				},
+				volume: {
+					voice: 'How loud the voice is',
+					ambience: 'How loud the background sounds are',
+					music: 'How loud the music is'
+				},
+				recorded: {
+					voice: 'The voice is recorded',
+					ambience: 'The background sounds are recorded',
+					music: 'The music is recorded'
+				},
+				removed: {
+					voice: 'The voice is deleted',
+					ambience: 'The background sounds are deleted',
+					music: 'The music is deleted'
+				}
+			},
+			mixer: 'How loud the cartoon’s sounds are, and deleting them',
 			finishRecording: 'Finish recording',
-			removeVoice: 'Delete the voice',
 			recording: 'Recording…',
-			voiced: 'The voice is recorded',
-			unvoiced: 'The voice is deleted',
-			hasVoice: 'With a voice',
+			hasSound: (count: number) => withSounds(count),
 			voiceProblems: {
 				denied:
 					'The microphone isn’t allowed. Allow it for this site in the browser’s settings, then try again.',

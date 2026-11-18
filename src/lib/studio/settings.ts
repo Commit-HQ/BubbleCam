@@ -56,6 +56,9 @@ export const zoomRange = { min: 1, max: 3, step: 0.1 };
 /** How long a picture can be held on screen beyond its turn, in seconds. */
 export const holdRange = { min: 0, max: 5, step: 0.5 };
 
+/** How loud one of a cartoon's sounds can play: from silent to as loud as it was recorded. */
+export const volumeRange = { min: 0, max: 1, step: 0.05 };
+
 /** The self-timer's countdowns, in seconds: none, or long enough to take a hand away, or to get in the picture. */
 export const timerChoices = [0, 3, 5, 10];
 

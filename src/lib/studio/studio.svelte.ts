@@ -5,7 +5,8 @@
 // played or made into a video only once every picture in it can be read back. What a grown-up set for the studio
 // (settings.ts) is read once, as it opens.
 //
-// A film can have a voice, recorded while it plays through once (voice.ts). The camera stops for the recording
+// A film can have three sounds that play together, a voice, the noises around the toys, and music, each
+// recorded by itself while the film plays through once (voice.ts). The camera stops for the recording
 // and starts again on the way back to it: a phone doesn't always keep a camera and a microphone, opened one
 // after the other, both going.
 //
@@ -38,7 +39,10 @@ import {
 	keepFilms,
 	orderFrames,
 	setFps,
-	setVoice,
+	setSound,
+	setVolume,
+	layers,
+	type Layer,
 	type Film
 } from './films.ts';
 import { coverCrop, filmSize, zoomCrop, type Size } from './geometry.ts';
@@ -51,6 +55,7 @@ import {
 	loadSettings,
 	pictureQuality,
 	saveSettings,
+	volumeRange,
 	zoomRange,
 	type Settings
 } from './settings.ts';
@@ -66,10 +71,11 @@ import {
 	speak,
 	tap,
 	tick,
+	turn,
 	wake
 } from './sound.ts';
 import { Eye, lookEvery, Stillness, type StillState } from './stillness.ts';
-import { openMicrophone, VoiceRecorder } from './voice.ts';
+import { openMicrophone, roomSound, VoiceRecorder } from './voice.ts';
 
 /** The three speeds a child picks from, in pictures a second. */
 export const speeds = { slow: 5, walk: 8, fast: 12 } as const;
@@ -95,7 +101,9 @@ export type CameraState = 'off' | 'starting' | 'on' | CameraProblem;
 export type Trigger = 'off' | 'still' | 'clap';
 
 /** What just happened, for screen readers. */
-export type Event = { type: 'taken' | 'removed' | 'moved' | 'voiced' | 'unvoiced'; count: number };
+export type Event =
+	| { type: 'taken' | 'removed' | 'moved'; count: number }
+	| { type: 'voiced' | 'unvoiced'; count: number; layer: Layer };
 
 /** How many seconds are counted down before a voice is recorded: time to draw breath. */
 const voiceCountdown = 3;
@@ -173,9 +181,15 @@ export class Studio {
 	triggerProblem = $state<CameraProblem>();
 	/** The seconds left of a countdown under way, to a picture or to recording a voice, or 0. */
 	counting = $state(0);
-	/** The film's voice, if one was recorded over it. */
-	voice = $state.raw<Blob>();
-	/** Whether a voice is being recorded, while the film plays through once. */
+	/** The film's sounds, by their layer: the ones that were recorded over it. */
+	sounds = $state.raw<Partial<Record<Layer, Blob>>>({});
+	/** How many sounds the film has, of the three: none is nothing to hear. */
+	sounded = $derived(layers.filter((layer) => this.sounds[layer]).length);
+	/** How loud each of the film's sounds plays, from 0 to 1. */
+	volumes = $state<Record<Layer, number>>({ voice: 1, ambience: 1, music: 1 });
+	/** The sound being recorded, from the tap that asks for it to the end of the recording. */
+	taking = $state<Layer>();
+	/** Whether a sound is being recorded, while the film plays through once. */
 	recording = $state(false);
 	/** Why a voice couldn't be recorded, when the microphone was asked for and didn't open. */
 	voiceProblem = $state<CameraProblem>();
@@ -234,8 +248,8 @@ export class Studio {
 	#takes = 0;
 	/** Whether a voice is on its way to being recorded or is being recorded, from the tap to the end. */
 	#voicing = false;
-	/** The voice decoded for playing, with the file it was decoded from. */
-	#spoken: { voice: Blob; sound: AudioBuffer | undefined } | undefined;
+	/** The sounds decoded for playing, each with the file it was decoded from. */
+	#spoken = new Map<Layer, { file: Blob; sound: AudioBuffer | undefined }>();
 	/** Called when a new film gets its ID, with its first picture. */
 	onstart: ((id: string) => void) | undefined;
 
@@ -259,10 +273,15 @@ export class Studio {
 	async load(id: string | null) {
 		const film = id ? await getFilm(id).catch(() => undefined) : undefined;
 		if (film) {
-			const { frames, holds, voice, ...rest } = film;
+			const { frames, holds, voice, ambience, music, volumes, ...rest } = film;
 			this.film = rest;
 			this.holds = holds ?? {};
-			this.voice = voice;
+			this.sounds = {
+				...(voice && { voice }),
+				...(ambience && { ambience }),
+				...(music && { music })
+			};
+			this.volumes = { voice: 1, ambience: 1, music: 1, ...volumes };
 			this.speed = speedOf(film.fps);
 			const thumbs = await getThumbs(frames);
 			this.frames = frames.map((frame) => ({ id: frame, thumb: addressOf(thumbs.get(frame)) }));
@@ -280,11 +299,12 @@ export class Studio {
 		this.#player.onshow = (index) => {
 			this.showing = index;
 			if (index !== 0) return;
-			// The film's first picture: a recording starts with it, and a voice starts over with each round.
+			// The film's first picture: a recording starts with it, and the sounds start over with each round.
+			// While one is recorded the others are silent, or the microphone would record them too.
 			if (this.#recorder && !this.recording) {
 				this.#recorder.start();
 				this.recording = true;
-			} else if (!this.#recorder && this.#spoken?.sound) speak(this.#spoken.sound);
+			} else if (!this.#recorder) this.#speak();
 		};
 		this.#player.onend = () => void this.#endRecording(true);
 		// Turning a phone turns the camera's picture with it.
@@ -764,29 +784,60 @@ export class Studio {
 		this.voiceProblem = undefined;
 		const ids = this.frames.map((frame) => frame.id);
 		const holds = $state.snapshot(this.holds);
-		const voice = this.voice;
-		// The tap that plays the film is what lets its voice be heard, a moment later.
-		if (voice) wake();
+		const sounds = this.sounds;
+		// The tap that plays the film is what lets its sounds be heard, a moment later.
+		if (this.sounded) wake();
 		this.#write(async () => {
-			if (voice && this.#spoken?.voice !== voice) {
-				this.#spoken = { voice, sound: await decodeVoice(voice) };
+			for (const layer of layers) {
+				const file = sounds[layer];
+				if (!file) this.#spoken.delete(layer);
+				else if (this.#spoken.get(layer)?.file !== file) {
+					this.#spoken.set(layer, { file, sound: await decodeVoice(file) });
+				}
 			}
-			if (!voice) this.#spoken = undefined;
 			if (this.mode === 'play' && !this.#voicing)
 				this.#player?.play(ids, speeds[this.speed], holds);
 		});
 	}
 
+	/** Starts the film's sounds together, each as loud as it's set. */
+	#speak() {
+		const heard = layers.flatMap((layer) => {
+			const sound = this.sounds[layer] && this.#spoken.get(layer)?.sound;
+			return sound ? [{ name: layer, sound, volume: this.volumes[layer] }] : [];
+		});
+		if (heard.length) speak(heard);
+	}
+
 	/**
-	 * Records a voice over the film: after a short countdown, the film plays through once while the microphone
-	 * listens, and what was said becomes the film's voice, in place of any it had. `finishRecording` ends it
-	 * sooner and keeps what was said so far; anything else that stops the film gives it up.
+	 * Sets how loud one of the film's sounds plays, on the page and in what's playing. `keepVolume` then keeps
+	 * it on the device, once the slider has been let go.
 	 */
-	async record() {
+	setVolume(layer: Layer, volume: number) {
+		this.volumes[layer] = within(volumeRange, volume);
+		turn(layer, this.volumes[layer]);
+	}
+
+	/** Keeps how loud one of the film's sounds plays, after `setVolume`. */
+	keepVolume(layer: Layer) {
+		const film = this.film;
+		if (!film) return;
+		const volume = this.volumes[layer];
+		this.#write(() => setVolume(film.id, layer, volume));
+	}
+
+	/**
+	 * Records one of the film's sounds over it: after a short countdown, the film plays through once while the
+	 * microphone listens, and what was heard becomes that sound, in place of any the film had there. The film's
+	 * other sounds are silent meanwhile. `finishRecording` ends it sooner and keeps what was heard so far;
+	 * anything else that stops the film gives it up.
+	 */
+	async record(layer: Layer = 'voice') {
 		const film = this.film;
 		if (!film || this.frames.length < 2 || this.#voicing) return;
 		this.#stopPlaying();
 		this.#voicing = true;
+		this.taking = layer;
 		this.mode = 'play';
 		this.selected = -1;
 		this.showing = -1;
@@ -798,7 +849,8 @@ export class Studio {
 		const first = decode(getImage, ids[0]);
 		try {
 			listen(true);
-			const microphone = await openMicrophone();
+			// A voice is tidied up by the phone; noises and music are recorded as the room sounds.
+			const microphone = await openMicrophone(layer === 'voice' ? true : roomSound);
 			// Given up while the browser was asking.
 			if (take !== this.#takes || this.mode !== 'play') {
 				closeCamera(microphone);
@@ -846,8 +898,10 @@ export class Studio {
 		void this.#endRecording(true);
 	}
 
-	/** Ends a recording, or the wait for one, and lets the microphone go. A voice that's kept is then played. */
+	/** Ends a recording, or the wait for one, and lets the microphone go. A sound that's kept is then played. */
 	async #endRecording(keep: boolean) {
+		const layer = this.taking;
+		this.taking = undefined;
 		this.#takes++;
 		this.#voicing = false;
 		closeCamera(this.#microphone);
@@ -859,24 +913,25 @@ export class Studio {
 		const voice = await recorder.stop();
 		this.#unlisten();
 		const film = this.film;
-		if (!keep || !voice?.size || !film) return;
-		this.voice = voice;
-		this.event = { type: 'voiced', count: this.frames.length };
-		this.#write(() => setVoice(film.id, voice));
+		if (!keep || !voice?.size || !film || !layer) return;
+		this.sounds = { ...this.sounds, [layer]: voice };
+		this.event = { type: 'voiced', count: this.frames.length, layer };
+		this.#write(() => setSound(film.id, layer, voice));
 		if (this.mode === 'play') this.play();
 	}
 
-	/** Takes the film's voice away. */
-	removeVoice() {
+	/** Takes one of the film's sounds away. */
+	removeSound(layer: Layer = 'voice') {
 		const film = this.film;
-		if (!film || !this.voice || this.#recorder) return;
-		this.voice = undefined;
-		this.#spoken = undefined;
-		hush();
-		this.event = { type: 'unvoiced', count: this.frames.length };
+		if (!film || !this.sounds[layer] || this.#recorder) return;
+		const { [layer]: _, ...others } = this.sounds;
+		this.sounds = others;
+		this.#spoken.delete(layer);
+		hush(layer);
+		this.event = { type: 'unvoiced', count: this.frames.length, layer };
 		pop();
 		tap();
-		this.#write(() => setVoice(film.id, undefined));
+		this.#write(() => setSound(film.id, layer, undefined));
 	}
 
 	setSpeed(speed: Speed) {
@@ -897,7 +952,8 @@ export class Studio {
 				...$state.snapshot(film),
 				frames: this.frames.map((frame) => frame.id),
 				holds: $state.snapshot(this.holds),
-				voice: this.voice
+				...this.sounds,
+				volumes: $state.snapshot(this.volumes)
 			}
 		);
 	}

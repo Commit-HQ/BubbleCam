@@ -1,13 +1,13 @@
 <script lang="ts">
 	import Icon from '#lib/components/Icon.svelte';
 	import { formatDay, messages, type Locale } from '#lib/i18n/index.ts';
-	import { getThumbs, type Film } from '#lib/studio/films.ts';
+	import { getThumbs, soundsOf, type Film } from '#lib/studio/films.ts';
 	import { timeline } from '#lib/studio/timeline.ts';
 	import { appPath } from '#lib/paths.ts';
 	import { onDestroy } from 'svelte';
 
-	// A cartoon on the cartoons' page: its first picture, full size so it's sharp, how many it has, and when it was
-	// made. Pointed at with a mouse or reached with the keyboard, it plays its thumbnails at the film's speed, a
+	// A cartoon on the cartoons' page: its first picture, full size so it's sharp, how many pictures and how many
+	// sounds it has, and when it was made. Pointed at with a mouse or reached with the keyboard, it plays its thumbnails at the film's speed, a
 	// little preview, in which a held picture stays as long as it does in the film.
 	let {
 		film,
@@ -17,6 +17,8 @@
 	}: { film: Film; cover: string | undefined; locale: Locale; onremove: () => void } = $props();
 	const t = $derived(messages[locale].app.films);
 	const day = $derived(formatDay(locale, film.created));
+	/** How many sounds the cartoon has, of the three. */
+	const sounds = $derived(soundsOf(film).length);
 
 	let preview = $state<string>();
 	/** The thumbnails' addresses, read once, the first time the card plays. */
@@ -59,7 +61,7 @@
 	<a
 		class="group block rounded-4xl glass p-2 transition hover:-translate-y-1 hover:bg-white/80 motion-reduce:hover:translate-y-0"
 		href={appPath(locale, { id: film.id })}
-		aria-label={t.open(day, film.frames.length, Boolean(film.voice))}
+		aria-label={t.open(day, film.frames.length, sounds)}
 		onpointerenter={(event) => event.pointerType === 'mouse' && play()}
 		onpointerleave={stop}
 		onfocus={play}
@@ -79,7 +81,11 @@
 				class="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink/75 px-3 py-1 font-display font-semibold text-white"
 			>
 				<Icon name="film" class="size-4" />{film.frames.length}
-				{#if film.voice}<Icon name="mic" class="size-4" />{/if}
+				{#if sounds}
+					<span class="ml-1 inline-flex items-center gap-1.5">
+						<Icon name="mic" class="size-4" />{sounds}
+					</span>
+				{/if}
 			</span>
 		</div>
 		<p class="px-2 pt-2 pb-1 font-display font-semibold sm:px-3 sm:pt-2.5 sm:pb-1.5 sm:text-lg">
