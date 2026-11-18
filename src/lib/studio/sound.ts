@@ -16,14 +16,18 @@ export function mute(off: boolean) {
 /** Safari's say in how the page's sound sits beside other sound, which other browsers don't have. */
 const session = () => (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
 
+/** Whether the microphone is to be heard (`listen`), which the first sound mustn't undo. */
+let listening = false;
+
 /** The audio context, made on the first tap, as browsers require. */
 function audio() {
 	if (!context) {
 		const safari = session();
-		if (safari) safari.type = 'ambient';
+		if (safari) safari.type = listening ? 'play-and-record' : 'ambient';
 		context = new AudioContext();
 	}
-	if (context.state === 'suspended') void context.resume();
+	// Safari also stops it for a phone call or when the microphone opens, which isn't "suspended" by name.
+	if (context.state !== 'running') void context.resume().catch(() => {});
 	return context;
 }
 
@@ -42,10 +46,11 @@ export function wake() {
 }
 
 /**
- * Lets the microphone be heard while a voice is recorded, and goes back to sounds that mix with others after:
- * Safari gives the microphone nothing while the page only plays along.
+ * Lets the microphone be heard while a voice is recorded or a clap is listened for, and goes back to sounds
+ * that mix with others after: Safari gives the microphone nothing while the page only plays along.
  */
 export function listen(on: boolean) {
+	listening = on;
 	try {
 		const safari = session();
 		if (safari) safari.type = on ? 'play-and-record' : 'ambient';

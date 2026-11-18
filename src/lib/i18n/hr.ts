@@ -50,7 +50,7 @@ export const hr: Messages = {
 			},
 			{
 				title: 'Mikrofon',
-				copy: 'BubbleCam koristi mikrofon samo dok snimate glas za crtić. Preglednik dopuštenje za mikrofon traži zajedno s onim za kameru, da se snimanje poslije ne prekida. Snimljeni glas ostaje na uređaju, uz sličice.'
+				copy: 'BubbleCam koristi mikrofon samo dok snimate glas za crtić i dok je u studiju uključeno slikanje na pljesak. Dok čeka pljesak, samo mjeri koliko je glasno: ništa se ne snima niti šalje. Preglednik dopuštenje za mikrofon traži zajedno s onim za kameru, da se snimanje poslije ne prekida. Snimljeni glas ostaje na uređaju, uz sličice.'
 			},
 			{
 				title: 'Bez računa, kolačića i praćenja',
@@ -154,7 +154,12 @@ export const hr: Messages = {
 			},
 			advanced: {
 				title: 'Napredni alati',
-				hint: 'U studio dodaje zum, jačinu duha, mrežu preko kamere, samookidač, premještanje sličica, zadržavanje sličice na zaslonu i video koji se ponavlja.'
+				hint: 'U studio dodaje zum, jačinu duha, mrežu preko kamere, samookidač, slikanje bez dodira (kad se kadar umiri ili na pljesak), premještanje sličica, zadržavanje sličice na zaslonu i video koji se ponavlja.'
+			},
+			clap: {
+				title: 'Osjetljivost na pljesak',
+				hint: 'Koliko glasan pljesak mora biti da snimi sličicu, kad je u studiju uključeno slikanje na pljesak. Smanjite je ako sličice nastaju i od govora.',
+				options: { low: 'Manja', normal: 'Standardna', high: 'Veća' }
 			},
 			done: 'Gotovo'
 		},
@@ -199,7 +204,7 @@ export const hr: Messages = {
 				busy: 'Neka druga aplikacija koristi mikrofon. Zatvori je, pa pokušaj ponovno.',
 				unsupported: 'Ovaj preglednik ne može snimati glas.'
 			},
-			tools: 'Zum, duh, mreža i samookidač',
+			tools: 'Zum, duh, mreža, samookidač i slikanje bez dodira',
 			zoom: 'Zum',
 			ghostStrength: 'Jačina duha',
 			grid: 'Mreža preko kamere',
@@ -207,6 +212,13 @@ export const hr: Messages = {
 			again: 'Odbrojavaj ponovno nakon svake sličice',
 			stopTimer: 'Zaustavi samookidač',
 			counting: (seconds: number) => `Sličica za ${seconds}`,
+			triggers: {
+				title: 'Slikaj bez dodira',
+				still: 'Kad se umiri',
+				clap: 'Na pljesak'
+			},
+			still: { waiting: 'Pomakni igračku', moving: 'Miče se…', settling: 'Mirno…' },
+			clap: 'Pljesni!',
 			hold: 'Zadrži ovu sličicu na zaslonu',
 			moveEarlier: 'Pomakni ovu sličicu ranije',
 			moveLater: 'Pomakni ovu sličicu kasnije',

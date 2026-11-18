@@ -17,7 +17,10 @@
 	// With the advanced tools on, sliders for the zoom and the ghost's strength open over the camera, with
 	// buttons for a grid that divides the picture in thirds and for the self-timer, whose countdown shows big in
 	// the middle; and a picture being looked at has arrows that move it earlier or later in the film, and a
-	// slider that holds it on screen for a few seconds when the film plays.
+	// slider that holds it on screen for a few seconds when the film plays. Under the sliders are the two
+	// triggers that press the shutter by themselves, one at a time: when the picture has settled, or at a clap.
+	// While one is on, a little sign at the foot of the picture shows what it sees or hears: a bar that fills as
+	// the picture stays still, or one that jumps with the room's noise and is full at a clap.
 	//
 	// While the film plays, a microphone beside the speeds records a voice over it: the film then plays through
 	// once, after a countdown, and the same button ends the recording sooner. A film with a voice has a bin
@@ -167,8 +170,37 @@
 					<Icon name="camera" class="size-5 motion-safe:animate-pulse" />{t.starting}
 				</p>
 			</div>
-		{:else if studio.mode === 'live' && studio.camera === 'on' && studio.frames.length < 2 && !studio.counting}
-			<!-- What to do, for the first two pictures. -->
+		{:else if studio.mode === 'live' && studio.camera === 'on' && studio.trigger !== 'off' && !studio.counting}
+			<p
+				class="absolute inset-x-3 bottom-3 mx-auto flex w-fit max-w-[90%] items-center gap-3 rounded-full bg-night/70 py-2 pr-5 pl-4 font-display font-semibold text-white ring-1 ring-white/15 backdrop-blur-md sm:bottom-4 sm:text-lg"
+			>
+				{#if studio.trigger === 'still'}
+					<Icon name="eye" class="size-6 shrink-0 text-sun" />
+					<span>{t.still[studio.stillness]}</span>
+					<span class="meter" aria-hidden="true">
+						<span class="still" style:width="{studio.settled * 100}%"></span>
+					</span>
+				{:else}
+					{#key studio.claps}
+						<span class={studio.claps ? 'heard' : ''}>
+							<Icon name="ear" class="size-6 shrink-0 text-sun" />
+						</span>
+					{/key}
+					<span>{t.clap}</span>
+					<span class="meter" aria-hidden="true">
+						<span style:width="{studio.loudness * 100}%"></span>
+					</span>
+				{/if}
+			</p>
+		{:else if studio.mode === 'live' && studio.camera === 'on' && studio.triggerProblem}
+			<p
+				class="absolute inset-x-3 bottom-3 mx-auto w-fit max-w-[90%] rounded-3xl bg-night/80 px-4 py-2 text-center font-medium ring-1 ring-white/15 backdrop-blur-md"
+				role="status"
+			>
+				{t.voiceProblems[studio.triggerProblem]}
+			</p>
+		{:else if studio.mode === 'live' && studio.camera === 'on' && studio.frames.length < 2 && !studio.counting && !tools}
+			<!-- What to do, for the first two pictures. The tools, while they're open, need the room. -->
 			<p
 				class="hint absolute inset-x-3 bottom-3 mx-auto w-fit max-w-[90%] rounded-3xl bg-night/70 px-4 py-2 text-center font-display font-medium text-white ring-1 ring-white/15 backdrop-blur-md sm:bottom-4 sm:rounded-full sm:px-5 sm:py-3 sm:text-lg"
 			>
@@ -226,6 +258,25 @@
 				>
 					<Icon name="timer" class="size-6" />{#if studio.timer}<span>{studio.timer}</span>{/if}
 				</button>
+				<!-- The shutter pressing itself, one way at a time. Off whenever the studio opens. -->
+				<div class="col-span-2 -ml-2 flex gap-1 pb-1" role="group" aria-label={t.triggers.title}>
+					<button
+						type="button"
+						class="{toolButton} grow grid-flow-col gap-2 font-display font-semibold"
+						aria-pressed={studio.trigger === 'still'}
+						onclick={() => studio.setTrigger(studio.trigger === 'still' ? 'off' : 'still')}
+					>
+						<Icon name="eye" class="size-6" /><span>{t.triggers.still}</span>
+					</button>
+					<button
+						type="button"
+						class="{toolButton} grow grid-flow-col gap-2 font-display font-semibold"
+						aria-pressed={studio.trigger === 'clap'}
+						onclick={() => studio.setTrigger(studio.trigger === 'clap' ? 'off' : 'clap')}
+					>
+						<Icon name="ear" class="size-6" /><span>{t.triggers.clap}</span>
+					</button>
+				</div>
 			</div>
 		{/if}
 
@@ -370,6 +421,35 @@
 			opacity: 0;
 		}
 	}
+	/* A trigger's bar: how long the picture has been still, or how loud the room is. */
+	.meter {
+		width: 4.5rem;
+		height: 0.6rem;
+		flex-shrink: 0;
+		overflow: hidden;
+		border-radius: 999px;
+		background: rgb(255 255 255 / 0.22);
+	}
+	.meter > span {
+		display: block;
+		height: 100%;
+		border-radius: inherit;
+		background: var(--color-sun);
+	}
+	/* The still one is looked at ten times a second, and glides between the looks. */
+	.meter > .still {
+		transition: width 0.1s linear;
+	}
+	/* The ear jumps when it has heard a clap. */
+	.heard {
+		display: inline-grid;
+		animation: heard 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+	@keyframes heard {
+		from {
+			transform: scale(1.9);
+		}
+	}
 	/* The first hint bobs gently, to be noticed. */
 	.hint {
 		animation: bob 2.4s ease-in-out infinite;
@@ -384,7 +464,8 @@
 			animation-duration: 0.12s;
 		}
 		.hint,
-		.count {
+		.count,
+		.heard {
 			animation: none;
 		}
 	}

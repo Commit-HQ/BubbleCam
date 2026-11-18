@@ -49,7 +49,7 @@ export const en = {
 			},
 			{
 				title: 'The microphone',
-				copy: 'BubbleCam uses the microphone only while you record a voice for a cartoon. The browser asks to allow it together with the camera, so recording isn’t interrupted later. The recorded voice stays on the device, with the pictures.'
+				copy: 'BubbleCam uses the microphone only while you record a voice for a cartoon, and while taking pictures on a clap is turned on in the studio. While it waits for a clap it only measures how loud the room is: nothing is recorded or sent. The browser asks to allow it together with the camera, so recording isn’t interrupted later. The recorded voice stays on the device, with the pictures.'
 			},
 			{
 				title: 'No accounts, cookies, or tracking',
@@ -155,7 +155,12 @@ export const en = {
 			},
 			advanced: {
 				title: 'Advanced tools',
-				hint: 'Adds to the studio: zoom, the ghost’s strength, a grid over the camera, a self-timer, moving pictures, holding a picture on screen, and a video that repeats.'
+				hint: 'Adds to the studio: zoom, the ghost’s strength, a grid over the camera, a self-timer, hands-free pictures (when the picture settles, or on a clap), moving pictures, holding a picture on screen, and a video that repeats.'
+			},
+			clap: {
+				title: 'Clap sensitivity',
+				hint: 'How loud a clap has to be to take a picture, when pictures on a clap are turned on in the studio. Lower it if talking takes pictures too.',
+				options: { low: 'Lower', normal: 'Standard', high: 'Higher' }
 			},
 			done: 'Done'
 		},
@@ -202,7 +207,7 @@ export const en = {
 				unsupported: 'This browser can’t record a voice.'
 			},
 			/** The advanced tools, which a grown-up turns on in the settings. */
-			tools: 'Zoom, ghost, grid, and self-timer',
+			tools: 'Zoom, ghost, grid, self-timer, and hands-free pictures',
 			zoom: 'Zoom',
 			ghostStrength: 'Ghost’s strength',
 			grid: 'Grid over the camera',
@@ -210,6 +215,13 @@ export const en = {
 			again: 'Count down again after each picture',
 			stopTimer: 'Stop the self-timer',
 			counting: (seconds: number) => `A picture in ${seconds}`,
+			triggers: {
+				title: 'Take pictures hands-free',
+				still: 'When it’s still',
+				clap: 'On a clap'
+			},
+			still: { waiting: 'Move the toy', moving: 'Moving…', settling: 'Hold still…' },
+			clap: 'Clap!',
 			hold: 'Hold this picture on screen',
 			moveEarlier: 'Move this picture earlier',
 			moveLater: 'Move this picture later',

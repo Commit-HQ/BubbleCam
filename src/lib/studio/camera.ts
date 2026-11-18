@@ -20,16 +20,11 @@ export class CameraError extends Error {
  *
  * When the browser is about to ask whether the camera is allowed, the microphone is asked for with it, so
  * recording a voice later doesn't stop to ask again. The microphone is let go at once: it's only on while a
- * voice is recorded (voice.ts). Without a microphone, or where both are refused, the camera is asked for alone.
+ * voice is recorded (voice.ts) or a clap is listened for. Without a microphone, or where both are refused, the camera is asked for alone.
  */
 export async function openCamera(facing: Facing, long = longSide): Promise<MediaStream> {
 	if (!navigator.mediaDevices?.getUserMedia) throw new CameraError('unsupported');
-	const video = {
-		facingMode: { ideal: facing },
-		width: { ideal: long },
-		height: { ideal: (long * 9) / 16 },
-		frameRate: { ideal: 30 }
-	};
+	const video = pictureOf(facing, long);
 	try {
 		if (await asksFirst()) {
 			try {
@@ -47,6 +42,37 @@ export async function openCamera(facing: Facing, long = longSide): Promise<Media
 	} catch (error) {
 		throw new CameraError(problemOf(error));
 	}
+}
+
+/**
+ * Opens the camera and the microphone in one go, for a shutter that listens for a clap (clap.ts). A phone
+ * doesn't always keep both going when they're opened one after the other, so a camera that's on is closed first
+ * and opened again with the microphone. `sound` says what the microphone is asked for.
+ */
+export async function openCameraAndMicrophone(
+	facing: Facing,
+	long: number,
+	sound: MediaTrackConstraints
+): Promise<MediaStream> {
+	if (!navigator.mediaDevices?.getUserMedia) throw new CameraError('unsupported');
+	try {
+		return await navigator.mediaDevices.getUserMedia({
+			audio: sound,
+			video: pictureOf(facing, long)
+		});
+	} catch (error) {
+		throw new CameraError(problemOf(error));
+	}
+}
+
+/** The picture a camera is asked for. */
+function pictureOf(facing: Facing, long: number): MediaTrackConstraints {
+	return {
+		facingMode: { ideal: facing },
+		width: { ideal: long },
+		height: { ideal: (long * 9) / 16 },
+		frameRate: { ideal: 30 }
+	};
 }
 
 /** Whether the browser will ask the person before it opens the camera. Browsers that don't say aren't asked. */

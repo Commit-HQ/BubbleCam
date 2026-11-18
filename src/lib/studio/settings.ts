@@ -3,6 +3,7 @@
 // alone, the ghost's strength, the grid, the self-timer, and how often a video repeats, counts only while
 // they're on, so switching them off brings back the plain studio without forgetting what was chosen.
 
+import type { Keenness } from './clap.ts';
 import { longSide, type Shape } from './geometry.ts';
 
 export type Quality = 'small' | 'normal' | 'high';
@@ -36,6 +37,8 @@ export type Settings = {
 	timer: number;
 	/** How many times a video plays the cartoon. */
 	loops: number;
+	/** How easily a sound counts as a clap, for the shutter that listens for one (clap.ts). */
+	clap: Keenness;
 };
 
 /**
@@ -72,7 +75,8 @@ export const defaults: Settings = {
 	ghost: 0.45,
 	grid: false,
 	timer: 0,
-	loops: 1
+	loops: 1,
+	clap: 'normal'
 };
 
 /** The long side of a new cartoon's pictures, in pixels, which is also what the camera is asked for, and their
@@ -88,6 +92,7 @@ const key = 'bubblecam:settings';
 
 const shapes: Shape[] = ['auto', 'landscape', 'portrait'];
 const qualities: Quality[] = ['small', 'normal', 'high'];
+const keennesses: Keenness[] = ['low', 'normal', 'high'];
 
 /** The settings in what the device kept, with the default for anything missing or not understood. */
 export function readSettings(kept: string | null): Settings {
@@ -119,7 +124,8 @@ export function readSettings(kept: string | null): Settings {
 		ghost: within(ghostRange, found.ghost, defaults.ghost),
 		grid: flag(found.grid, defaults.grid),
 		timer: one(timerChoices, found.timer, defaults.timer),
-		loops: one(loopChoices, found.loops, defaults.loops)
+		loops: one(loopChoices, found.loops, defaults.loops),
+		clap: one(keennesses, found.clap, defaults.clap)
 	};
 }
 

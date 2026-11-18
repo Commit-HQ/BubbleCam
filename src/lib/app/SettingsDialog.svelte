@@ -27,6 +27,7 @@
 	let apple = $state(false);
 
 	const qualities = ['small', 'normal', 'high'] as const;
+	const keennesses = ['low', 'normal', 'high'] as const;
 
 	async function pass() {
 		open = true;
@@ -100,6 +101,17 @@
 				checked={settings.advanced}
 				onchange={(advanced) => set('advanced', advanced)}
 			/>
+			{#if settings.advanced}
+				<!-- For the shutter that a clap presses, which is one of the advanced tools. -->
+				<Choice
+					name="clap"
+					legend={t.settings.clap.title}
+					hint={t.settings.clap.hint}
+					options={keennesses.map((value) => ({ value, label: t.settings.clap.options[value] }))}
+					value={settings.clap}
+					onchange={(clap) => set('clap', clap)}
+				/>
+			{/if}
 			{#if locks}
 				<Switch
 					title={t.settings.lock.title}

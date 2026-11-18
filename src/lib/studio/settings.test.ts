@@ -14,7 +14,8 @@ const chosen: Settings = {
 	ghost: 0.7,
 	grid: true,
 	timer: 5,
-	loops: 3
+	loops: 3,
+	clap: 'low'
 };
 
 it('starts with the defaults, on a device that has kept nothing', () => {
@@ -28,7 +29,14 @@ it('reads back what was chosen', () => {
 });
 
 it('keeps the default for anything it doesn’t understand', () => {
-	const kept = { shape: 'round', lock: 'yes', ghost: 'strong', pictures: 'huge', video: 'high' };
+	const kept = {
+		shape: 'round',
+		lock: 'yes',
+		ghost: 'strong',
+		pictures: 'huge',
+		video: 'high',
+		clap: 'deaf'
+	};
 	expect(readSettings(JSON.stringify(kept))).toEqual({ ...defaults, video: 'high' });
 	expect(readSettings(JSON.stringify({ loops: 4 })).loops).toBe(1);
 	expect(readSettings(JSON.stringify({ timer: 7 })).timer).toBe(0);

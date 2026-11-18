@@ -7,8 +7,14 @@
 //
 // A film can have a voice, recorded while it plays through once (voice.ts). The camera stops for the recording
 // and starts again on the way back to it: a phone doesn't always keep a camera and a microphone, opened one
-// after the other, both going. Browser-only.
+// after the other, both going.
+//
+// With the advanced tools, the shutter can press itself, so a child doesn't walk round to the phone for every
+// picture: when the camera's picture has settled after something moved in it (stillness.ts), or at a clap
+// (clap.ts). For the clap the camera is opened again together with the microphone, which then stays on for as
+// long as the trigger does. Both are off whenever the studio opens. Browser-only.
 
+import { Claps, Ear, earConstraints, hearEvery } from './clap.ts';
 import { decode } from './decode.ts';
 import {
 	CameraError,
@@ -16,6 +22,8 @@ import {
 	countCameras,
 	facesUser,
 	openCamera,
+	openCameraAndMicrophone,
+	problemOf,
 	type CameraProblem,
 	type Facing
 } from './camera.ts';
@@ -47,7 +55,20 @@ import {
 	type Settings
 } from './settings.ts';
 import { Shutter } from './shutter.ts';
-import { click, decodeVoice, hush, listen, mute, pop, speak, tap, tick, wake } from './sound.ts';
+import {
+	click,
+	decodeVoice,
+	hush,
+	listen,
+	mute,
+	pop,
+	soundContext,
+	speak,
+	tap,
+	tick,
+	wake
+} from './sound.ts';
+import { Eye, lookEvery, Stillness, type StillState } from './stillness.ts';
 import { openMicrophone, VoiceRecorder } from './voice.ts';
 
 /** The three speeds a child picks from, in pictures a second. */
@@ -70,11 +91,24 @@ export type Mode = 'live' | 'review' | 'play';
 
 export type CameraState = 'off' | 'starting' | 'on' | CameraProblem;
 
+/** What presses the shutter by itself: nothing, the camera's picture settling, or a clap. */
+export type Trigger = 'off' | 'still' | 'clap';
+
 /** What just happened, for screen readers. */
 export type Event = { type: 'taken' | 'removed' | 'moved' | 'voiced' | 'unvoiced'; count: number };
 
 /** How many seconds are counted down before a voice is recorded: time to draw breath. */
 const voiceCountdown = 3;
+
+/**
+ * How long after a clap the picture is taken, in milliseconds: the table has stopped shaking by then, and the
+ * hands are out of the way. A clap is known to be one a little after it began (clap.ts), so the picture
+ * follows it by some six tenths of a second.
+ */
+const clapWait = 450;
+
+/** How long the studio's own sounds are kept from being taken for a clap, at least, in milliseconds. */
+const ownSound = 500;
 
 /** Where the device remembers which camera the studio used last. */
 const facingKey = 'bubblecam:facing';
@@ -126,6 +160,17 @@ export class Studio {
 	 * big button stops them. Off whenever the studio opens, so a series never starts by surprise.
 	 */
 	again = $state(false);
+	/** What presses the shutter by itself. Off whenever the studio opens, like `again`. */
+	trigger = $state<Trigger>('off');
+	/** What the picture is doing, for the trigger that waits for it to settle, and how far the wait has got. */
+	stillness = $state<StillState>('waiting');
+	settled = $state(0);
+	/** How loud the room is, for the trigger that waits for a clap: 1 is as loud as a clap has to be. */
+	loudness = $state(0);
+	/** Counts the claps heard while the studio is open, for the listener's little jump. */
+	claps = $state(0);
+	/** Why claps can't be listened for, when the microphone was asked for and didn't open. */
+	triggerProblem = $state<CameraProblem>();
 	/** The seconds left of a countdown under way, to a picture or to recording a voice, or 0. */
 	counting = $state(0);
 	/** The film's voice, if one was recorded over it. */
@@ -172,6 +217,16 @@ export class Studio {
 	/** When the big button has rested from its last press, by the page's clock. */
 	#rested = 0;
 	#countdown: ReturnType<typeof setTimeout> | undefined;
+	/** The triggers: what watches the picture, what listens to the room, and the clock that asks them. */
+	#eye = new Eye();
+	#still = new Stillness();
+	#ear: Ear | undefined;
+	#claps = new Claps();
+	#watching: ReturnType<typeof setInterval> | undefined;
+	/** The wait between a clap and its picture. */
+	#clapped: ReturnType<typeof setTimeout> | undefined;
+	/** Until when sounds aren't taken for claps, by the page's clock: the studio's own click is one. */
+	#deaf = 0;
 	/** The recorder while a voice is recorded, and the microphone from when it opens until the recorder has it. */
 	#recorder: VoiceRecorder | undefined;
 	#microphone: MediaStream | undefined;
@@ -190,6 +245,7 @@ export class Studio {
 		this.ghostStrength = this.settings.ghost;
 		this.grid = this.settings.grid;
 		this.timer = this.settings.timer;
+		this.#claps.keenness = this.settings.clap;
 		mute(!this.settings.sounds);
 	}
 
@@ -238,6 +294,7 @@ export class Studio {
 	}
 
 	async startCamera() {
+		this.#closeEar();
 		closeCamera(this.#stream);
 		this.#stream = undefined;
 		if (this.#closed || !this.#video) return;
@@ -245,7 +302,7 @@ export class Studio {
 		const start = ++this.#starts;
 		this.camera = 'starting';
 		try {
-			const stream = await openCamera(this.facing, this.#cameraLong());
+			const stream = await this.#open();
 			if (this.#closed || start !== this.#starts) return closeCamera(stream);
 			this.#stream = stream;
 			this.mirrored = facesUser(stream);
@@ -259,10 +316,57 @@ export class Studio {
 			}
 			this.source = { width: video.videoWidth, height: video.videoHeight };
 			this.camera = 'on';
+			this.#hearWith(stream);
 			this.cameras = await countCameras();
 		} catch (error) {
 			this.camera = error instanceof CameraError ? error.problem : 'unsupported';
 		}
+	}
+
+	/**
+	 * Opens the camera, together with the microphone while a clap is listened for. Where the microphone can't be
+	 * had, the camera opens alone, and the studio goes on without the clap and says why.
+	 */
+	async #open() {
+		if (this.trigger === 'clap') {
+			listen(true);
+			try {
+				return await openCameraAndMicrophone(this.facing, this.#cameraLong(), earConstraints);
+			} catch (error) {
+				this.#giveUpClaps(error instanceof CameraError ? error.problem : problemOf(error));
+			}
+		}
+		return openCamera(this.facing, this.#cameraLong());
+	}
+
+	/** Starts listening to the microphone a camera was opened with, or lets go of one no longer wanted. */
+	#hearWith(stream: MediaStream) {
+		if (this.trigger !== 'clap') return dropMicrophone(stream);
+		if (!stream.getAudioTracks().length) return;
+		try {
+			this.#ear = new Ear(soundContext(), stream);
+		} catch {
+			dropMicrophone(stream);
+			this.#giveUpClaps('unsupported');
+		}
+	}
+
+	#giveUpClaps(problem: CameraProblem) {
+		if (this.trigger !== 'clap') return;
+		this.trigger = 'off';
+		this.triggerProblem = problem;
+		this.#unlisten();
+		this.#watch();
+	}
+
+	#closeEar() {
+		this.#ear?.close();
+		this.#ear = undefined;
+	}
+
+	/** Lets the page's sound mix with other sound again, unless the microphone is still listened to for claps. */
+	#unlisten() {
+		listen(this.trigger === 'clap' && !this.#closed);
 	}
 
 	/**
@@ -288,6 +392,7 @@ export class Studio {
 	stopCamera() {
 		this.stopTimer();
 		this.#starts++;
+		this.#closeEar();
 		closeCamera(this.#stream);
 		this.#stream = undefined;
 		if (this.#video) this.#video.srcObject = null;
@@ -318,6 +423,93 @@ export class Studio {
 		this.#rested = now + this.rest;
 		if (this.counting) this.stopTimer();
 		else if (this.timer) this.#countToPicture();
+		else this.#take();
+	}
+
+	/**
+	 * Chooses what presses the shutter by itself: the picture settling, a clap, or nothing. A clap needs the
+	 * microphone, so the camera is opened again with it, and without it once claps aren't listened for.
+	 */
+	async setTrigger(trigger: Trigger) {
+		if (trigger === this.trigger) return;
+		const heard = this.trigger === 'clap';
+		this.trigger = trigger;
+		this.triggerProblem = undefined;
+		this.stopTimer();
+		this.#watch();
+		if (trigger === 'clap') {
+			// The tap is what lets the page's sound start, which listening is a part of.
+			wake();
+			await this.startCamera();
+		} else if (heard) {
+			this.#closeEar();
+			if (this.#stream) dropMicrophone(this.#stream);
+			this.#unlisten();
+		}
+	}
+
+	/** Starts the trigger's clock, or stops it, and has the trigger start over. */
+	#watch() {
+		clearInterval(this.#watching);
+		clearTimeout(this.#clapped);
+		this.#watching = undefined;
+		this.#still.reset();
+		this.#claps.reset();
+		this.stillness = 'waiting';
+		this.settled = 0;
+		this.loudness = 0;
+		if (this.#closed) return;
+		if (this.trigger === 'still') this.#watching = setInterval(() => this.#look(), lookEvery);
+		if (this.trigger === 'clap') this.#watching = setInterval(() => this.#hear(), hearEvery);
+	}
+
+	/** One look at the camera's picture, for the trigger that waits for it to settle. */
+	#look() {
+		const video = this.#video;
+		const shape = this.shape;
+		// Whatever takes the camera's place, or counts down to a picture, has the watch start over.
+		if (!video || !shape || !this.#ready() || this.counting) {
+			this.#still.reset();
+			this.stillness = 'waiting';
+			this.settled = 0;
+			return;
+		}
+		const source = { width: video.videoWidth, height: video.videoHeight };
+		const look = this.#eye.look(video, zoomCrop(coverCrop(source, shape), this.zoom));
+		if (!look) return;
+		const still = this.#still.feed(look, performance.now());
+		this.stillness = this.#still.state;
+		this.settled = this.#still.progress;
+		if (still) this.#fire();
+	}
+
+	/** One listen to the room, for the trigger that waits for a clap. */
+	#hear() {
+		const now = performance.now();
+		const ear = this.#ear;
+		if (!ear || !this.#ready() || this.counting || now < this.#deaf) {
+			this.#claps.reset();
+			this.loudness = 0;
+			return;
+		}
+		const level = ear.level();
+		const clap = this.#claps.feed(level, now, () => ear.heard());
+		// The bar jumps with the room and falls back gently, in steps, so the page isn't redrawn for nothing.
+		const shown = Math.max(Math.min(1, level / this.#claps.threshold), this.loudness - 0.1);
+		this.loudness = Math.round(shown * 20) / 20;
+		if (!clap) return;
+		this.claps++;
+		this.#deaf = now + clapWait + 100;
+		this.#clapped = setTimeout(() => {
+			if (this.trigger === 'clap') this.#fire();
+		}, clapWait);
+	}
+
+	/** What a trigger does when it goes off: what the big button would, short of stopping a countdown. */
+	#fire() {
+		if (!this.#ready() || this.counting) return;
+		this.#rested = performance.now() + this.rest;
+		if (this.timer) this.#countToPicture();
 		else this.#take();
 	}
 
@@ -385,6 +577,9 @@ export class Studio {
 		this.event = { type: 'taken', count: this.frames.length };
 		click();
 		tap();
+		// The triggers start over with each picture, however it was taken, and the click isn't a clap.
+		this.#still.reset();
+		this.#deaf = performance.now() + Math.max(this.rest, ownSound);
 		this.#write(async () => {
 			const files = await picture.catch(() => undefined);
 			// A picture that couldn't be encoded leaves the strip as if it had been deleted.
@@ -437,6 +632,7 @@ export class Studio {
 		this.event = { type: 'removed', count: this.frames.length };
 		pop();
 		tap();
+		this.#deaf = performance.now() + ownSound;
 		this.#write(() => deleteFrame(film.id, frame.id));
 		if (last) this.#write(() => this.#drawGhost());
 		if (this.mode === 'review') {
@@ -480,6 +676,8 @@ export class Studio {
 	/** Zooms the camera's picture in, for the pictures taken from now on. */
 	setZoom(zoom: number) {
 		this.zoom = within(zoomRange, zoom);
+		// Zooming changes the whole picture, which isn't a toy being moved.
+		this.#still.reset();
 	}
 
 	/** Sets how strongly the ghost shows, and keeps it for the next time. */
@@ -608,7 +806,7 @@ export class Studio {
 			}
 			this.#microphone = microphone;
 		} catch (error) {
-			listen(false);
+			this.#unlisten();
 			void first.then((picture) => picture?.close());
 			if (take !== this.#takes) return;
 			// The film plays on, with why it has no voice yet.
@@ -630,7 +828,7 @@ export class Studio {
 				this.#recorder = new VoiceRecorder(microphone);
 			} catch {
 				closeCamera(microphone);
-				listen(false);
+				this.#unlisten();
 				this.#voicing = false;
 				this.play();
 				this.voiceProblem = 'unsupported';
@@ -657,9 +855,9 @@ export class Studio {
 		const recorder = this.#recorder;
 		this.#recorder = undefined;
 		this.recording = false;
-		if (!recorder) return listen(false);
+		if (!recorder) return this.#unlisten();
 		const voice = await recorder.stop();
-		listen(false);
+		this.#unlisten();
 		const film = this.film;
 		if (!keep || !voice?.size || !film) return;
 		this.voice = voice;
@@ -707,6 +905,7 @@ export class Studio {
 	/** Closes the studio. Pictures still being encoded or saved finish first. */
 	close() {
 		this.#closed = true;
+		this.#watch();
 		this.#stopPlaying();
 		this.stopCamera();
 		const thumbs = this.frames.map((frame) => frame.thumb);
@@ -730,6 +929,14 @@ export class Studio {
 		// A picture taken meanwhile is the ghost already.
 		if (picture && this.frames.at(-1)?.id === last.id) draw(ghost, picture);
 		picture?.close();
+	}
+}
+
+/** Lets a stream's microphone go and keeps its camera. */
+function dropMicrophone(stream: MediaStream) {
+	for (const track of stream.getAudioTracks()) {
+		track.stop();
+		stream.removeTrack(track);
 	}
 }
 
