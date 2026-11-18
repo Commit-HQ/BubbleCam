@@ -2,6 +2,17 @@
 
 What's new in each version of BubbleCam, newest first. The version a page was built from is in the footer of the landing pages and the cartoons' page.
 
+## 0.4.0 (2026-11-18)
+
+Pictures without a touch, and three sounds.
+
+- With the advanced tools, the shutter can press itself, so a child doesn't walk round to the phone for every picture: when the picture has settled after something moved, or at a clap. Two buttons under the zoom turn it on, one way at a time, and a sign at the foot of the picture shows what it sees or hears.
+- How easily a clap is heard can be set in the settings: lower, standard, or higher. While the shutter listens for a clap the microphone stays on and only measures how loud the room is, and the privacy page says so.
+- With the advanced tools, a cartoon has three sounds that play together: a voice, background sounds, and music. Each has a button beside the speeds that records it at once, and is yellow with a tick once it's recorded.
+- The button in the top bar opens the tools of what the picture shows. Over a playing cartoon, where it used to do nothing, it opens a slider for how loud each sound plays and a bin for each.
+- A cartoon's video carries its sounds, mixed as loud as each was set.
+- A cartoon's card and the studio show how many sounds it has, beside the microphone.
+
 ## 0.3.1 (2026-11-17)
 
 - In the settings, the advanced tools come right after the cartoon's shape.
